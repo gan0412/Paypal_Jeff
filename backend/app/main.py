@@ -1,19 +1,31 @@
 from contextlib import asynccontextmanager
 import logging
 from fastapi import FastAPI, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware          
 from fastapi.responses import JSONResponse
 
-from app import __version__
-from app.config import settings
-from app.jeff_core import generate_chat_response, generate_evaluation
-from app.models import (
-    ChatRequest,
-    ChatResponse,
-    EvaluateRequest,
-    EvaluateResponse,
-    HealthResponse,
-)
+try:
+    from . import __version__
+    from .config import settings
+    from .jeff_core import generate_chat_response, generate_evaluation
+    from .models import (
+        ChatRequest,
+        ChatResponse,
+        EvaluateRequest,
+        EvaluateResponse,
+        HealthResponse,
+    )
+except ImportError:
+    from app import __version__
+    from app.config import settings
+    from app.jeff_core import generate_chat_response, generate_evaluation
+    from app.models import (
+        ChatRequest,
+        ChatResponse,
+        EvaluateRequest,
+        EvaluateResponse,
+        HealthResponse,
+    )
 
 # Configure logging
 logging.basicConfig(

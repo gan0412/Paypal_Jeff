@@ -3,20 +3,36 @@ from typing import List, Optional
 import anthropic
 from fastapi import HTTPException
 
-from app.config import settings
-from app.guardrails import check_policy_probe, redact_pii
-from app.models import (
-    ChatMessage,
-    ChatResponse,
-    EvaluateResponse,
-    TransactionContext,
-)
-from app.prompts import (
-    EVALUATE_SYSTEM_PROMPT,
-    EVALUATE_TOOL_DEFINITION,
-    JEFF_SYSTEM_PROMPT,
-    JEFF_TOOL_DEFINITION,
-)
+try:
+    from .config import settings
+    from .guardrails import check_policy_probe, redact_pii
+    from .models import (
+        ChatMessage,
+        ChatResponse,
+        EvaluateResponse,
+        TransactionContext,
+    )
+    from .prompts import (
+        EVALUATE_SYSTEM_PROMPT,
+        EVALUATE_TOOL_DEFINITION,
+        JEFF_SYSTEM_PROMPT,
+        JEFF_TOOL_DEFINITION,
+    )
+except ImportError:
+    from app.config import settings
+    from app.guardrails import check_policy_probe, redact_pii
+    from app.models import (
+        ChatMessage,
+        ChatResponse,
+        EvaluateResponse,
+        TransactionContext,
+    )
+    from app.prompts import (
+        EVALUATE_SYSTEM_PROMPT,
+        EVALUATE_TOOL_DEFINITION,
+        JEFF_SYSTEM_PROMPT,
+        JEFF_TOOL_DEFINITION,
+    )
 
 logger = logging.getLogger("jeff_backend")
 
