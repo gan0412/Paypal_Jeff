@@ -12,7 +12,8 @@ All JSON uses **snake_case**. Base path: `/api`. Backend suggestion: FastAPI on 
 // Payment (what the user is about to send)
 { "amount": 2400.0, "currency": "USD",
   "recipient_name": "Daniel Reyes", "recipient_email": "daniel.r@example.com",
-  "recipient_is_new": true, "note": "for your flight, love you" }
+  "recipient_is_new": true, "note": "for your flight, love you",
+  "payment_type": "friends_family" | "goods_services" }   // how the sender chose to pay; friends_family has no purchase protection
 
 // Risk (the engine's current view; the frontend only displays it)
 { "score": 0-100, "level": "low" | "elevated" | "high",
@@ -33,7 +34,7 @@ All JSON uses **snake_case**. Base path: `/api`. Backend suggestion: FastAPI on 
 `POST /api/session/start`  body: `{ "payment": Payment }`
 
 Response: `AgentTurn` plus `"session_id": "abc123"`.
-Called when the user presses Send. The payment must be **held** (not sent) until step 3.
+Called when the user opens Jeff's chat or presses "Send payment now" (the chat icon is in the lower-right corner of the payment screens). The payment must be **held** (not sent) until step 3.
 
 ## 2. Send a chat message
 

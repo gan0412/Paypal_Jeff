@@ -13,6 +13,7 @@ export const PRESETS: ScenarioPreset[] = [
       recipient_email: 'daniel.reyes.88@example.com',
       recipient_is_new: true,
       note: 'for your flight to come see me, love you',
+      payment_type: 'friends_family',
     },
   },
   {
@@ -26,6 +27,7 @@ export const PRESETS: ScenarioPreset[] = [
       recipient_email: 'give@hope4children-relief.example.com',
       recipient_is_new: true,
       note: 'urgent donation',
+      payment_type: 'friends_family',
     },
   },
   {
@@ -39,6 +41,7 @@ export const PRESETS: ScenarioPreset[] = [
       recipient_email: 'priya.shah@example.com',
       recipient_is_new: false,
       note: 'November rent',
+      payment_type: 'friends_family',
     },
   },
 ];

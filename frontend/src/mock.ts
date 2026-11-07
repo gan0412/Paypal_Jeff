@@ -27,160 +27,136 @@ interface Scenario {
 
 const SCENARIOS: Record<ScenarioId, Scenario> = {
   romance: {
-    baseScore: 55,
+    baseScore: 48,
     signals: [
       { code: 'new_recipient', label: 'First payment to this person' },
       { code: 'large_amount', label: 'Much larger than your usual payments', detail: '$2,400 vs a typical $60' },
       { code: 'emotional_note', label: 'Note mentions travel and a relationship' },
     ],
-    opening:
-      "Hi, I'm Jeff, an AI assistant that takes a second look at bigger payments. This one is larger than you usually send, and it's to someone new. I'm not here to stop you. Can I ask who Daniel is?",
+    opening: "Hi, I'm Jeff, an AI assistant. This is a big payment to someone new. Who is Daniel to you?",
     openingMood: 'listening',
     openingQuick: ['We met online', "He's my partner", "It's for a flight"],
     rules: [
       {
         test: /never met|haven'?t met|not met|only online|met online|dating|app/i,
-        reply:
-          "Thanks for telling me. That's very common, and plenty of online relationships are real. Have the two of you been able to talk on a live video call?",
+        reply: 'Thanks. Have you been able to video call him live?',
         mood: 'listening',
         delta: 8,
-        quick: ["Yes, many times", "No, his camera is always broken", "We only text"],
+        quick: ['Yes, many times', 'No, his camera is broken', 'We only text'],
         signal: { code: 'met_online', label: 'Relationship started online' },
       },
       {
         test: /camera|can'?t video|no video|only text|deployed|military|oil rig|offshore|abroad|overseas/i,
-        reply:
-          "I want to be gentle here. When someone asks for money for travel and can never video call, it's a pattern that's often seen in romance scams. I'm not saying that's what's happening with Daniel. Has he asked you to keep this payment private, or sent it with any pressure to hurry?",
+        reply: "That's a common pattern in romance scams. I'm not saying that's what this is. Has he asked you to hurry or keep it private?",
         mood: 'concerned',
         delta: 17,
-        quick: ["Yes, he said it's urgent", "No pressure at all"],
+        quick: ["Yes, it's urgent", 'No pressure'],
         signal: { code: 'no_video', label: 'Has not been seen on live video' },
       },
       {
         test: /don'?t tell|secret|keep it|private|urgent|hurry|asap|today|right now/i,
-        reply:
-          "Thank you for being open about that. Urgency and secrecy are the two things scammers rely on, because they stop you from talking it over with someone you trust. A real partner usually doesn't mind you taking a day. Would you be open to a protected payment, or to talking it over with a friend first?",
+        reply: "Urgency and secrecy are what scammers rely on. A real partner won't mind you waiting a day. Want to use a protected payment?",
         mood: 'concerned',
         delta: 15,
-        quick: ["I'll think about it", "I trust him"],
+        quick: ["I'll think about it", 'I trust him'],
         signal: { code: 'pressure', label: 'Pressure to act quickly or keep it quiet' },
       },
       {
         test: /gift card|crypto|bitcoin|wire|zelle|friends and family/i,
-        reply:
-          "That's a payment method that can't easily be reversed, which is why it's often requested in scams. A protected payment would keep your buyer protections.",
+        reply: "Those can't easily be reversed. A protected payment keeps your protections.",
         mood: 'concerned',
         delta: 18,
         signal: { code: 'unsafe_method', label: 'Asked to pay in a hard-to-reverse way' },
       },
       {
         test: /trust|love|sure|know him|partner|boyfriend|girlfriend|fianc/i,
-        reply:
-          "I understand, and trust matters. I just want to be sure the decision is fully yours. Can you tell me how you first got in touch, and how long ago that was?",
+        reply: 'I understand. How did you two first meet, and when?',
         mood: 'listening',
         delta: 3,
       },
     ],
     followups: [
-      {
-        reply: "That helps me understand. Have you met him in person, even once?",
-        mood: 'listening',
-        quick: ['Never', 'Yes, in person'],
-      },
-      {
-        reply: "Would it be possible to ask him for a quick live video call before you send this? A real person usually says yes.",
-        mood: 'thinking',
-      },
+      { reply: 'Have you met him in person?', mood: 'listening', quick: ['Never', 'Yes'] },
+      { reply: 'Could you ask him for a live video call first?', mood: 'thinking' },
     ],
     closing: {
-      high:
-        "I can't tell you what to do, and you know your situation better than I do. But there are several warning signs here, so I'd suggest a protected payment, or waiting a day and talking it over with someone you trust. Whatever you choose is up to you.",
-      low:
-        "That all sounds reasonable. I don't see anything worrying, so it's your call.",
+      high: "I can't decide for you, but there are several warning signs. A protected payment, or waiting a day, would be safer.",
+      low: "That sounds reasonable. It's your call.",
     },
   },
 
   charity: {
-    baseScore: 48,
+    baseScore: 40,
     signals: [
       { code: 'new_recipient', label: 'First payment to this organization' },
       { code: 'urgent_wording', label: "Note says 'urgent'" },
       { code: 'unverified_org', label: "Couldn't confirm the organization's registration" },
     ],
-    opening:
-      "Hi, I'm Jeff, an AI assistant that takes a second look at payments. This is a donation to an organization you haven't paid before. How did you hear about Hope4Children Relief?",
+    opening: "Hi, I'm Jeff, an AI assistant. This is a donation to a new organization. How did you hear about them?",
     openingMood: 'listening',
-    openingQuick: ['A text message', 'A social media post', "A friend told me", 'I searched for it'],
+    openingQuick: ['A text message', 'A social media post', 'A friend', 'I searched'],
     rules: [
       {
         test: /text|sms|dm|message|call|phone|email|facebook|instagram|tiktok|social|post|ad\b|link/i,
-        reply:
-          "Thanks. Donation requests that arrive out of the blue are one of the most common ways charity scams reach people. Real charities are usually happy to be checked. Do you know if they're registered?",
+        reply: "Unexpected donation requests are a common scam. Do you know if they're registered?",
         mood: 'concerned',
         delta: 17,
-        quick: ["I didn't check", "They say they're registered"],
+        quick: ["I didn't check", 'They say they are'],
         signal: { code: 'unsolicited', label: 'Donation request came out of the blue' },
       },
       {
         test: /friend|family|coworker|colleague|searched|google|website|known|always/i,
-        reply:
-          "That's a better sign. Did you find it through their own website, and have you donated to them before?",
+        reply: "That's a good sign. Is this your first time giving to them?",
         mood: 'listening',
         delta: -8,
-        quick: ["First time", "I've given before"],
+        quick: ['First time', "I've given before"],
       },
       {
         test: /urgent|today|deadline|right now|hurry|emergency/i,
-        reply:
-          "Urgency is a tactic. Real causes will still be there tomorrow. In the U.S., the IRS Tax Exempt Organization Search can confirm a charity in about a minute. Would you like to check before sending?",
+        reply: 'Urgency is a tactic. Real causes will still be there tomorrow. Want to check their registration first?',
         mood: 'concerned',
         delta: 12,
         signal: { code: 'pressure', label: 'Pressure to give immediately' },
       },
       {
         test: /registered|verified|tax|501|checked|looked it up/i,
-        reply: "Good, checking is exactly the right instinct. If it shows up as registered under that exact name, that's reassuring.",
+        reply: "Good instinct. If it's registered under that exact name, that's reassuring.",
         mood: 'relieved',
         delta: -12,
       },
     ],
-    followups: [
-      { reply: "Are you able to give through the charity's official website instead of a direct transfer?", mood: 'thinking' },
-    ],
+    followups: [{ reply: "Could you give through their official website instead?", mood: 'thinking' }],
     closing: {
-      high:
-        "I can't confirm this organization, and the request had some pressure behind it. A protected payment, or giving through a charity you've verified, would be safer. It's your decision.",
-      low:
-        "That sounds fine. Checking first was a good move. It's your call.",
+      high: "I can't confirm this organization. A protected payment, or giving through a charity you've verified, is safer.",
+      low: 'Sounds fine. Checking first was smart.',
     },
   },
 
   legit: {
     baseScore: 12,
     signals: [{ code: 'known_recipient', label: 'You have paid Priya 11 times before' }],
-    opening:
-      "Hi, I'm Jeff, an AI assistant that takes a second look at payments. This looks like a regular one: $850 to Priya Shah, someone you've paid before. Is this your usual monthly rent?",
+    opening: "Hi, I'm Jeff, an AI assistant. This looks like your usual payment to Priya. Is it November rent?",
     openingMood: 'calm',
     openingQuick: ['Yes, rent', "It's something else"],
     rules: [
       {
         test: /yes|rent|usual|monthly|roommate|same/i,
-        reply: "That matches your history, so I don't see anything to worry about. You're all set whenever you're ready.",
+        reply: "That matches your history. You're all set.",
         mood: 'relieved',
         delta: -6,
       },
       {
         test: /else|different|new|loan|borrow|asked me/i,
-        reply: "Thanks for letting me know. Can you tell me a bit more about what it's for?",
+        reply: "Thanks. What's it for?",
         mood: 'listening',
         delta: 18,
-        quick: ['A deposit', "She asked for extra"],
+        quick: ['A deposit', 'She asked for extra'],
       },
     ],
     followups: [{ reply: 'Thanks, that helps.', mood: 'calm' }],
     closing: {
-      high: "I'd suggest a quick check with Priya through a number you already have before sending. It's your call.",
-      low: "Everything looks consistent with your usual payments. You're all set.",
+      high: "Maybe check with Priya using a number you already have. It's your call.",
+      low: "All consistent with your usual payments. You're all set.",
     },
   },
 };
@@ -223,7 +199,7 @@ function inferScenario(p: Payment): ScenarioId {
 
 function turn(s: Session, message: string, mood: Mood, quick?: string[], done = false): AgentTurn {
   const risk = riskOf(s);
-  const suggest = done || risk.level === 'high';
+  const suggest = done || risk.level === 'high' || (risk.level === 'low' && mood === 'relieved');
   return { message, mood, risk, quick_replies: quick, recommended: suggest ? recommend(risk.level) : null, done };
 }
 
@@ -237,6 +213,10 @@ export const mockApi = {
       scenario, payment, score: sc.baseScore, signals: [...sc.signals],
       usedRules: new Set(), followupIdx: 0, turns: 0,
     };
+    if (payment.payment_type === 'friends_family' && payment.recipient_is_new) {
+      s.score += 10;
+      s.signals.push({ code: 'friends_family', label: 'Sent as Friends & Family (no purchase protection)' });
+    }
     sessions.set(id, s);
     return { session_id: id, ...turn(s, sc.opening, sc.openingMood, sc.openingQuick) };
   },
@@ -268,13 +248,13 @@ export const mockApi = {
     await sleep(500);
     if (!sessions.has(sessionId)) throw new Error('This session has expired. Please start again.');
     if (choice === 'cancel')
-      return { status: 'cancelled', message: "Payment cancelled. Nothing was sent. You can always come back to it." };
+      return { status: 'cancelled', message: 'Nothing was sent.' };
     if (choice === 'protected')
       return {
         status: 'protected',
-        message: 'We set up a protected payment instead. The money is only released once you confirm you are happy. (Demo: no real order was created.)',
+        message: 'The money is released when you confirm. (Demo)',
         order_id: 'DEMO-ORDER-1042',
       };
-    return { status: 'sent', message: 'Payment sent. (Demo: no real money moved.)' };
+    return { status: 'sent', message: 'No real money moved. (Demo)' };
   },
 };

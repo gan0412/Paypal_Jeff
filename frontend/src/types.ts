@@ -3,6 +3,7 @@
 export type Mood = 'calm' | 'listening' | 'thinking' | 'concerned' | 'relieved';
 export type RiskLevel = 'low' | 'elevated' | 'high';
 export type Choice = 'continue' | 'protected' | 'cancel';
+export type PaymentType = 'friends_family' | 'goods_services';
 
 export interface Payment {
   amount: number;
@@ -11,6 +12,7 @@ export interface Payment {
   recipient_email: string;
   recipient_is_new: boolean;
   note: string;
+  payment_type: PaymentType; // how the sender chose to pay (friends & family has no purchase protection)
 }
 
 export interface RiskSignal {

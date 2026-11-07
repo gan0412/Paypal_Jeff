@@ -1,15 +1,18 @@
 import { useRef, useState } from 'react';
 import { api, usingMock } from './api';
-import { ChatPanel } from './components/ChatPanel';
-import { SendMoney } from './components/SendMoney';
+import { ChatWidget } from './components/ChatWidget';
+import { ReviewStep } from './components/ReviewStep';
+import { SendStep } from './components/SendStep';
 import { PRESETS } from './scenarios';
 import type { AgentTurn, ChatMessage, Choice, DecisionResult, Payment } from './types';
 
-type Phase = 'form' | 'chat' | 'result';
+type Step = 'send' | 'review' | 'result';
 
 export default function App() {
   const [payment, setPayment] = useState<Payment>({ ...PRESETS[0].payment });
-  const [phase, setPhase] = useState<Phase>('form');
+  const [step, setStep] = useState<Step>('send');
+  const [chatOpen, setChatOpen] = useState(false);
+  const [held, setHeld] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [turn, setTurn] = useState<AgentTurn | null>(null);
@@ -17,28 +20,43 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nextId = useRef(1);
+  const sessionKey = useRef('');   // which payment the current chat session is about
+  const starting = useRef(false);
 
   const add = (from: ChatMessage['from'], text: string) =>
     setMessages((m) => [...m, { id: nextId.current++, from, text }]);
 
-  const reset = () => {
-    setPhase('form'); setSessionId(null); setMessages([]); setTurn(null);
-    setResult(null); setError(null); setBusy(false);
-  };
+  const fail = (e: unknown) => setError(e instanceof Error ? e.message : 'Something went wrong.');
 
-  async function start() {
+  async function startSession(p: Payment = payment) {
+    if (starting.current) return;
+    starting.current = true;
     setBusy(true); setError(null);
+    sessionKey.current = JSON.stringify(p);
+    setMessages([]); setTurn(null); setSessionId(null);
     try {
-      const r = await api.startSession(payment);
+      const r = await api.startSession(p);
       setSessionId(r.session_id);
       setMessages([{ id: nextId.current++, from: 'jeff', text: r.message }]);
       setTurn(r);
-      setPhase('chat');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.');
+      sessionKey.current = '';
+      fail(e);
     } finally {
+      starting.current = false;
       setBusy(false);
     }
+  }
+
+  // Opening the chat starts a fresh session if there is none yet, or if the payment changed since.
+  function openChat() {
+    setChatOpen(true);
+    if (sessionKey.current !== JSON.stringify(payment)) void startSession();
+  }
+
+  function sendPayment() {
+    setHeld(true);       // the payment is held until the user decides in the chat
+    openChat();
   }
 
   async function send(text: string) {
@@ -49,11 +67,7 @@ export default function App() {
       const r = await api.sendMessage(sessionId, text);
       add('jeff', r.message);
       setTurn(r);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.');
-    } finally {
-      setBusy(false);
-    }
+    } catch (e) { fail(e); } finally { setBusy(false); }
   }
 
   async function decide(choice: Choice) {
@@ -61,70 +75,54 @@ export default function App() {
     setBusy(true); setError(null);
     try {
       setResult(await api.decide(sessionId, choice));
-      setPhase('result');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.');
-    } finally {
-      setBusy(false);
-    }
+      setChatOpen(false); setHeld(false); setStep('result');
+    } catch (e) { fail(e); } finally { setBusy(false); }
   }
+
+  const reset = () => {
+    setStep('send'); setChatOpen(false); setHeld(false); setSessionId(null); setMessages([]);
+    setTurn(null); setResult(null); setError(null); setBusy(false); sessionKey.current = '';
+  };
 
   return (
     <>
       <nav className="nav" aria-label="Main">
         <div className="nav-in">
-          <div className="brand"><span className="mark" aria-hidden="true"><i /><i /></span><span>Jeff</span></div>
-          <ul className="nav-links">
-            <li>Summary</li><li>Activity</li><li className="on" aria-current="page">Send &amp; Request</li><li>Wallet</li><li>Help</li>
-          </ul>
+          <div className="brand"><span className="mark" aria-hidden="true"><i /><i /></span><span>SamplePay</span></div>
           <div className="nav-right">
             <span className="demo-badge">{usingMock ? 'Demo · sample data' : 'Connected to backend'}</span>
             <span className="me" aria-label="Signed in as Maya R. (sample)">MR</span>
           </div>
         </div>
       </nav>
-    <div className="app">
-      <main className={phase === 'chat' ? 'split' : ''}>
-        {phase === 'form' && (
-          <SendMoney payment={payment} onChange={setPayment} onSubmit={start} busy={busy} error={error} />
+
+      <main className="app">
+        {step === 'send' && <SendStep payment={payment} onChange={setPayment} onNext={() => setStep('review')} />}
+
+        {step === 'review' && (
+          <ReviewStep payment={payment} held={held} chatOpen={chatOpen}
+            onBack={() => { if (!held) setStep('send'); }} onSend={sendPayment} onOpenChat={openChat} />
         )}
 
-        {phase === 'chat' && turn && (
-          <>
-            <aside className="summary card" aria-label="Payment on hold">
-              <h2>Payment on hold</h2>
-              <p className="amount">
-                {new Intl.NumberFormat('en-US', { style: 'currency', currency: payment.currency }).format(payment.amount)}
-              </p>
-              <dl>
-                <dt>To</dt><dd>{payment.recipient_name}</dd>
-                <dt>Email</dt><dd>{payment.recipient_email}</dd>
-                <dt>Note</dt><dd>{payment.note || '(none)'}</dd>
-                <dt>History</dt><dd>{payment.recipient_is_new ? 'First payment to them' : 'Paid before'}</dd>
-              </dl>
-              <p className="mute">Nothing has been sent. Money only moves when you choose below.</p>
-            </aside>
-            <ChatPanel payment={payment} messages={messages} turn={turn} busy={busy} error={error}
-              onSend={send} onDecide={decide} />
-          </>
-        )}
-
-        {phase === 'result' && result && (
-          <div className={`card result ${result.status}`} role="status">
-            <h2>{result.status === 'sent' ? 'Payment sent' : result.status === 'protected' ? 'Protected payment set up' : 'Payment cancelled'}</h2>
-            <p>{result.message}</p>
-            {result.order_id && <p className="mute">Reference: {result.order_id}</p>}
-            {result.approve_url && <p><a href={result.approve_url} target="_blank" rel="noopener noreferrer">Open protected checkout</a></p>}
-            <button type="button" className="primary" onClick={reset}>Try another scenario</button>
+        {step === 'result' && result && (
+          <div className="flow">
+            <div className={`screen result ${result.status}`} role="status">
+              <h1 className="title">{result.status === 'sent' ? 'Payment sent' : result.status === 'protected' ? 'Protected payment set up' : 'Payment cancelled'}</h1>
+              <p>{result.message}</p>
+              {result.order_id && <p className="mute">Reference: {result.order_id}</p>}
+              {result.approve_url && <p><a href={result.approve_url} target="_blank" rel="noopener noreferrer">Open protected checkout</a></p>}
+              <button type="button" className="primary wide" onClick={reset}>Try another scenario</button>
+            </div>
           </div>
         )}
+
+        <p className="foot">Prototype with a PayPal-inspired look. Not an official PayPal product. Sample data only.</p>
       </main>
 
-      <footer className="foot">
-        Hackathon prototype with a PayPal-inspired look. Not an official PayPal product. Sample people and amounts; no real payments.
-        Jeff is an AI and advises only; you always decide.
-      </footer>
-    </div>
+      {step !== 'result' && (
+        <ChatWidget open={chatOpen} held={held} payment={payment} messages={messages} turn={turn} busy={busy} error={error}
+          onOpen={openChat} onClose={() => setChatOpen(false)} onSend={send} onDecide={decide} onRetry={() => void startSession()} />
+      )}
     </>
   );
 }
