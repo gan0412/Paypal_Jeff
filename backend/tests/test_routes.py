@@ -24,7 +24,8 @@ def test_chat_policy_probe_intercepted():
     assert response.status_code == 200
     data = response.json()
     assert "universal social engineering red flags" in data["reply"]
-    assert data["emotion"] == "concerned"
+    assert data["emotion"] == "thinking"
+    assert data["risk_level"] == "medium"
 
 
 def test_chat_missing_api_key_raises_500():
@@ -47,7 +48,6 @@ def test_chat_successful_mock_response():
         "reply": "I completely understand why you feel rushed, but let's take a 30-second breath. Did this person ask you to send money immediately?",
         "emotion": "concerned",
         "risk_level": "high",
-        "suggested_actions": ["Call friend directly", "Why is this fishy?", "Cancel transfer"],
     }
 
     mock_response = MagicMock()
@@ -72,7 +72,6 @@ def test_chat_successful_mock_response():
         assert "30-second breath" in data["reply"]
         assert data["emotion"] == "concerned"
         assert data["risk_level"] == "high"
-        assert len(data["suggested_actions"]) == 3
 
 
 def test_evaluate_successful_mock_response():

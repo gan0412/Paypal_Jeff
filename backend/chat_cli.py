@@ -15,7 +15,6 @@ EMOTION_ICONS = {
     "neutral": "🙂",
     "thinking": "🤔",
     "concerned": "😟 ⚠️",
-    "relieved": "😌 ✨",
 }
 
 
@@ -62,9 +61,31 @@ def main():
     print(f" Transaction Draft: ${amount:.2f} USD to {recipient}")
     print(f" Note: \"{memo}\"")
     print("-" * 65)
-    print("Type your message to Jeff below (or 'exit' to quit).\n")
 
     history = []
+
+    # Proactive Risk Check: If risk is at least high, Jeff immediately alerts without user message!
+    try:
+        init_resp = httpx.post(
+            api_url,
+            json={"message": "", "history": [], "transaction": transaction_ctx},
+            timeout=30.0,
+        )
+        if init_resp.status_code == 200:
+            init_data = init_resp.json()
+            init_reply = init_data.get("reply", "")
+            init_emotion = init_data.get("emotion", "neutral")
+            init_risk = init_data.get("risk_level", "low")
+
+            if init_risk == "high" or init_emotion == "concerned":
+                icon = EMOTION_ICONS.get(init_emotion, "🙂")
+                print(f"\nJeff [{icon} {init_emotion.upper()} | Risk: {init_risk.upper()}]:")
+                print(f"  \"{init_reply}\"")
+                history.append({"role": "assistant", "content": init_reply})
+    except Exception:
+        pass
+
+    print("\nType your message to Jeff below (or 'exit' to quit).\n")
 
     while True:
         try:
@@ -93,16 +114,12 @@ def main():
             reply = data.get("reply", "")
             emotion = data.get("emotion", "neutral")
             risk_level = data.get("risk_level", "low")
-            actions = data.get("suggested_actions", [])
 
             icon = EMOTION_ICONS.get(emotion, "🙂")
 
             print(" " * 30, end="\r")  # Clear thinking text
             print(f"\nJeff [{icon} {emotion.upper()} | Risk: {risk_level.upper()}]:")
             print(f"  \"{reply}\"")
-
-            if actions:
-                print(f"\n  💡 Suggested Actions: {', '.join(f'[{a}]' for a in actions)}")
 
             # Update history
             history.append({"role": "user", "content": user_msg})

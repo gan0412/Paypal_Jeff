@@ -41,7 +41,6 @@ def test_chat_response_emotion_constraint():
         reply="Take a pause.",
         emotion="concerned",
         risk_level="high",
-        suggested_actions=["Call friend", "Cancel"],
     )
     assert resp.emotion == "concerned"
     assert resp.risk_level == "high"

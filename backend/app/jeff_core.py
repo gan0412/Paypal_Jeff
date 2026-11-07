@@ -86,9 +86,8 @@ async def generate_chat_response(
     if is_probe:
         return ChatResponse(
             reply=probe_reply,
-            emotion="concerned",
+            emotion="thinking",
             risk_level="medium",
-            suggested_actions=["Why is this payment suspicious?", "Cancel transaction"],
         )
 
     # 2. Sanitize user message and memo for PII
@@ -114,17 +113,23 @@ async def generate_chat_response(
             "content": redact_pii(msg.content),
         })
 
-    messages.append({
-        "role": "user",
-        "content": sanitized_message,
-    })
+    if sanitized_message and sanitized_message.strip():
+        messages.append({
+            "role": "user",
+            "content": sanitized_message,
+        })
+    else:
+        messages.append({
+            "role": "user",
+            "content": "[User opened chat or initiated transaction review without typing a message. If risk is at least high, immediately alert them. If low or medium, greet them naturally.]",
+        })
 
     client = get_anthropic_client()
 
     try:
         response = await client.messages.create(
             model=settings.anthropic_model,
-            max_tokens=600,
+            max_tokens=250,
             system=system_text,
             messages=messages,
             tools=[JEFF_TOOL_DEFINITION],
@@ -138,7 +143,14 @@ async def generate_chat_response(
                 raw_reply = input_data.get("reply", "I'm right here with you. Let's look at this transfer together.")
                 emotion = input_data.get("emotion", "neutral")
                 risk_level = input_data.get("risk_level", "low")
-                actions = input_data.get("suggested_actions", [])
+
+                # Ensure feelings correspond directly to risk level (low/safe/cancel -> neutral)
+                if risk_level == "high":
+                    emotion = "concerned"
+                elif risk_level == "medium":
+                    emotion = "thinking"
+                else:
+                    emotion = "neutral"
 
                 # Run outgoing reply through PII filter as secondary safeguard
                 safe_reply = redact_pii(raw_reply)
@@ -147,7 +159,6 @@ async def generate_chat_response(
                     reply=safe_reply,
                     emotion=emotion,
                     risk_level=risk_level,
-                    suggested_actions=actions,
                 )
 
         # Fallback if text block returned
@@ -157,14 +168,12 @@ async def generate_chat_response(
                     reply=redact_pii(block.text),
                     emotion="neutral",
                     risk_level="low",
-                    suggested_actions=["Tell me more", "Cancel transfer"],
                 )
 
         return ChatResponse(
             reply="When the scammers attack, Jeff has your back. Let's take a quick pause and verify this transfer together.",
             emotion="concerned",
-            risk_level="medium",
-            suggested_actions=["Verify recipient", "Cancel transfer"],
+            risk_level="high",
         )
 
     except anthropic.APIError as exc:

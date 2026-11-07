@@ -1,7 +1,7 @@
 from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
 
-EmotionState = Literal["neutral", "thinking", "concerned", "relieved"]
+EmotionState = Literal["neutral", "thinking", "concerned"]
 RiskLevel = Literal["low", "medium", "high"]
 RoleType = Literal["user", "assistant"]
 
@@ -25,7 +25,10 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     """Payload for conversational interaction with Jeff."""
 
-    message: str = Field(..., min_length=1, description="Latest message from the user")
+    message: Optional[str] = Field(
+        default="",
+        description="Latest message from the user (optional for proactive initial alert)",
+    )
     history: List[ChatMessage] = Field(default_factory=list, description="Previous messages in this session")
     transaction: Optional[TransactionContext] = Field(
         default=None,
@@ -39,15 +42,11 @@ class ChatResponse(BaseModel):
     reply: str = Field(..., description="Jeff's humanlike conversational response")
     emotion: EmotionState = Field(
         default="neutral",
-        description="Dynamic corner avatar expression state: neutral, thinking, concerned, or relieved",
+        description="Dynamic corner avatar expression state: neutral, thinking, or concerned",
     )
     risk_level: RiskLevel = Field(
         default="low",
         description="Current evaluated scam risk level: low, medium, or high",
-    )
-    suggested_actions: List[str] = Field(
-        default_factory=list,
-        description="Optional 1-3 quick suggested actions/responses for the user",
     )
 
 
