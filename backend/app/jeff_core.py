@@ -1,24 +1,19 @@
+import sys
+from pathlib import Path
+
+# Automatically inject backend and app directories into sys.path
+_app_dir = Path(__file__).resolve().parent
+_backend_dir = _app_dir.parent
+for _p in [str(_backend_dir), str(_app_dir)]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 import logging
 from typing import List, Optional
 import anthropic
 from fastapi import HTTPException
 
 try:
-    from .config import settings
-    from .guardrails import check_policy_probe, redact_pii
-    from .models import (
-        ChatMessage,
-        ChatResponse,
-        EvaluateResponse,
-        TransactionContext,
-    )
-    from .prompts import (
-        EVALUATE_SYSTEM_PROMPT,
-        EVALUATE_TOOL_DEFINITION,
-        JEFF_SYSTEM_PROMPT,
-        JEFF_TOOL_DEFINITION,
-    )
-except ImportError:
     from app.config import settings
     from app.guardrails import check_policy_probe, redact_pii
     from app.models import (
@@ -33,6 +28,38 @@ except ImportError:
         JEFF_SYSTEM_PROMPT,
         JEFF_TOOL_DEFINITION,
     )
+except (ImportError, ModuleNotFoundError):
+    try:
+        from .config import settings
+        from .guardrails import check_policy_probe, redact_pii
+        from .models import (
+            ChatMessage,
+            ChatResponse,
+            EvaluateResponse,
+            TransactionContext,
+        )
+        from .prompts import (
+            EVALUATE_SYSTEM_PROMPT,
+            EVALUATE_TOOL_DEFINITION,
+            JEFF_SYSTEM_PROMPT,
+            JEFF_TOOL_DEFINITION,
+        )
+    except (ImportError, ValueError):
+        import config as _config_mod
+        settings = _config_mod.settings
+        from guardrails import check_policy_probe, redact_pii
+        from models import (
+            ChatMessage,
+            ChatResponse,
+            EvaluateResponse,
+            TransactionContext,
+        )
+        from prompts import (
+            EVALUATE_SYSTEM_PROMPT,
+            EVALUATE_TOOL_DEFINITION,
+            JEFF_SYSTEM_PROMPT,
+            JEFF_TOOL_DEFINITION,
+        )
 
 logger = logging.getLogger("jeff_backend")
 

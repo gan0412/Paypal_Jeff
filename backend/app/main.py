@@ -1,3 +1,13 @@
+import sys
+from pathlib import Path
+
+# Automatically inject backend and app directories into sys.path
+_app_dir = Path(__file__).resolve().parent
+_backend_dir = _app_dir.parent
+for _p in [str(_backend_dir), str(_app_dir)]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 from contextlib import asynccontextmanager
 import logging
 from fastapi import FastAPI, HTTPException, status
@@ -5,17 +15,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 try:
-    from . import __version__
-    from .config import settings
-    from .jeff_core import generate_chat_response, generate_evaluation
-    from .models import (
-        ChatRequest,
-        ChatResponse,
-        EvaluateRequest,
-        EvaluateResponse,
-        HealthResponse,
-    )
-except ImportError:
     from app import __version__
     from app.config import settings
     from app.jeff_core import generate_chat_response, generate_evaluation
@@ -26,6 +25,30 @@ except ImportError:
         EvaluateResponse,
         HealthResponse,
     )
+except (ImportError, ModuleNotFoundError):
+    try:
+        from . import __version__
+        from .config import settings
+        from .jeff_core import generate_chat_response, generate_evaluation
+        from .models import (
+            ChatRequest,
+            ChatResponse,
+            EvaluateRequest,
+            EvaluateResponse,
+            HealthResponse,
+        )
+    except (ImportError, ValueError):
+        __version__ = "0.1.0"
+        import config as _config_mod
+        settings = _config_mod.settings
+        from jeff_core import generate_chat_response, generate_evaluation
+        from models import (
+            ChatRequest,
+            ChatResponse,
+            EvaluateRequest,
+            EvaluateResponse,
+            HealthResponse,
+        )
 
 # Configure logging
 logging.basicConfig(
@@ -114,3 +137,12 @@ async def evaluate_transaction(request: EvaluateRequest):
     a gentle proactive warning badge before the user authorizes payment.
     """
     return await generate_evaluation(transaction=request.transaction)
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        app,
+        host=settings.host,
+        port=settings.port,
+    )
