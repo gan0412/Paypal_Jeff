@@ -125,7 +125,6 @@ async def generate_chat_response(
         response = await client.messages.create(
             model=settings.anthropic_model,
             max_tokens=600,
-            temperature=0.3,
             system=system_text,
             messages=messages,
             tools=[JEFF_TOOL_DEFINITION],
@@ -199,7 +198,6 @@ async def generate_evaluation(transaction: TransactionContext) -> EvaluateRespon
         response = await client.messages.create(
             model=settings.anthropic_model,
             max_tokens=300,
-            temperature=0.2,
             system=EVALUATE_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}],
             tools=[EVALUATE_TOOL_DEFINITION],
