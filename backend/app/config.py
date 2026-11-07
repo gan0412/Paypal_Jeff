@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     """Application configuration settings loaded from environment or .env file."""
 
     anthropic_api_key: Optional[str] = None
-    anthropic_model: str = "claude-3-5-haiku-latest"
+    anthropic_model: str = "claude-haiku-5-5"
     host: str = "0.0.0.0"
     port: int = 8000
     environment: str = "development"
