@@ -3,6 +3,7 @@ import { api, usingMock } from './api';
 import { ChatWidget } from './components/ChatWidget';
 import { ReviewStep } from './components/ReviewStep';
 import { SendStep } from './components/SendStep';
+import { evaluatePaymentInstant } from './riskEvaluator';
 import { PRESETS } from './scenarios';
 import type { AgentTurn, ChatMessage, Choice, DecisionResult, Payment } from './types';
 
@@ -120,6 +121,9 @@ export default function App() {
     setTurn(null); setResult(null); setError(null); setBusy(false); sessionKey.current = '';
   };
 
+  const instantRisk = evaluatePaymentInstant(payment);
+  const isConcerned = (turn ? turn.mood === 'concerned' || turn.risk.level === 'high' : instantRisk.isConcerned) || held;
+
   return (
     <>
       <nav className="nav" aria-label="Main">
@@ -136,8 +140,16 @@ export default function App() {
         {step === 'send' && <SendStep payment={payment} onChange={handlePaymentChange} onNext={handleNext} />}
 
         {step === 'review' && (
-          <ReviewStep payment={payment} held={held} chatOpen={chatOpen}
-            onBack={() => { if (!held) setStep('send'); }} onSend={sendPayment} onOpenChat={openChat} />
+          <ReviewStep
+            payment={payment}
+            held={held}
+            chatOpen={chatOpen}
+            isConcerned={isConcerned}
+            nudge={instantRisk.nudge}
+            onBack={() => { if (!held) setStep('send'); }}
+            onSend={sendPayment}
+            onOpenChat={openChat}
+          />
         )}
 
         {step === 'result' && result && (
