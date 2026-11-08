@@ -81,12 +81,7 @@ export function ChatWidget(p: Props) {
     p.onSend(v);
   };
 
-  const [popupDismissed, setPopupDismissed] = useState(false);
   const instantRisk = evaluatePaymentInstant(p.payment);
-
-  useEffect(() => {
-    setPopupDismissed(false);
-  }, [p.payment.recipient_name, p.payment.amount, p.payment.note, p.payment.payment_type]);
 
   const faceMood: Mood = busy || !turn ? 'thinking' : text.trim() && !speaking ? 'listening' : turn.mood;
   const isConcerned = (turn ? turn.mood === 'concerned' || turn.risk.level === 'high' : instantRisk.isConcerned) || faceMood === 'concerned' || held;
@@ -100,35 +95,6 @@ export function ChatWidget(p: Props) {
 
   return (
     <>
-      {!open && isConcerned && !popupDismissed && (
-        <div className="proactive-alert-popup" onClick={p.onOpen} role="alert" aria-live="assertive">
-          <div className="proactive-alert-header">
-            <span className="proactive-alert-badge">
-              <svg viewBox="0 0 24 24" width={13} height={13} fill="#ffffff" aria-hidden="true">
-                <path d="M12 2.5L1.5 21h21L12 2.5z" />
-                <line x1="12" y1="9" x2="12" y2="14" stroke="#ff1f1f" strokeWidth="2.5" strokeLinecap="round" />
-                <circle cx="12" cy="17.5" r="1.3" fill="#ff1f1f" />
-              </svg>
-              High Scam Risk Alert
-            </span>
-            <button
-              type="button"
-              className="proactive-dismiss"
-              onClick={(e) => { e.stopPropagation(); setPopupDismissed(true); }}
-              aria-label="Dismiss alert"
-            >
-              ✕
-            </button>
-          </div>
-          <p className="proactive-alert-text">
-            {instantRisk.nudge}
-          </p>
-          <div className="proactive-alert-action">
-            <span>Tap to review warning with Jeff →</span>
-          </div>
-        </div>
-      )}
-
       {!open && (
         <button type="button" className={`launcher ${isConcerned || held ? 'has-alert' : ''}`} onClick={p.onOpen} aria-label="Open chat with Jeff, an AI assistant">
           <span className="launcher-label">{held ? '⚠️ Continue with Jeff' : isConcerned ? '⚠️ Jeff has a warning' : 'Ask Jeff'}</span>

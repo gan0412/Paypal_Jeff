@@ -144,8 +144,6 @@ export default function App() {
             payment={payment}
             held={held}
             chatOpen={chatOpen}
-            isConcerned={isConcerned}
-            nudge={instantRisk.nudge}
             onBack={() => { if (!held) setStep('send'); }}
             onSend={sendPayment}
             onOpenChat={openChat}
