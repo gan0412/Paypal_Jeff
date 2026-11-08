@@ -1,24 +1,22 @@
-# 🛡️ Jeff — The Conversational Anti-Scam Guardian for PayPal
+# 🛡️ Jeff — Paypal's Financial Bodyguard
 
-> **Mantra:** *"When the scammers attack, Jeff has your back."*  
-> **Domain:** Authorized Push Payment (APP) Fraud Prevention & Conversational De-escalation  
-> **PayPal AI Hackathon 2026**
+ *"When the scammers attack, Jeff has your back."*
 
----
 
-## 💡 Product Overview (For Judges)
 
-### The Problem: Why Static Warning Banners Fail
+## 💡 Product Overview
+
+### The Problem
 In modern **Authorized Push Payment (APP)**, one of the biggest threats is psychological manipulation and social engineering. Scammers emotionally manipulate victims through manufactured urgency, fake family emergencies, romance pretexts, and fake charities into authorizing transactions themselves.
 
 Victims in high-stress emotional states experience **cognitive tunnel vision**: they view static caution banners and generic warning popups as annoying friction and reflexively click past them.
 
-### The Solution: "Jeff"
-**Jeff** is an empathetic, humanlike AI security companion built directly into the PayPal checkout experience. Instead of acting as an inflexible blocking mechanism, Jeff acts as a calm, trusted second look:
+### The Solution
+**Jeff** is an empathetic, humanlike AI bodyguard built directly into the PayPal checkout experience. Instead of acting as an inflexible blocking mechanism, Jeff acts as a calm, trusted second look:
 
 1. **Real-Time Contextual Scanning:** Analyzes recipient history, transfer amount, payment memo, and transaction type (Friends & Family vs. Goods & Services) in real-time.
-2. **Non-Intrusive Visual Alerting:** When high scam risk is detected, Jeff's corner avatar immediately flashes a prominent red alert sign (warning triangle + pulsing halo). Jeff never forcibly hijacks the screen or locks the user out.
-3. **Conversational De-escalation:** Powered by **Claude 3.5 Haiku**, Jeff validates emotional stress, gently unpacks common scammer tactics (urgency, secrecy, lack of live video), and helps the user pause and think critically.
+2. **Non-Intrusive Visual Alerting:** When high scam risk is detected, Jeff's corner avatar immediately flashes a prominent red sign (warning triangle + pulsing halo) to alert the user. Jeff never forcibly hijacks the screen or locks the user out.
+3. **Conversational De-escalation:** Powered by **Claude 5.5 Haiku**, Jeff validates emotional stress, gently unpacks common scammer tactics (urgency, secrecy, lack of live video), and helps the user pause and think critically.
 4. **Strict Respect for User Agency:** Jeff **advises only and never blocks payments**. If a user confirms familiarity (e.g., *"It's my dad"*, *"I verified them"*), Jeff immediately shifts to calm/neutral without arguing or lecturing. The user always holds the final decision.
 5. **Meaningful PayPal Developer Integration:** Uses the official PayPal JavaScript SDK (`@paypal/react-paypal-js`) to render PayPal Smart Payment Buttons. When Jeff guides a user to safety, they can seamlessly switch from unprotected Friends & Family to protected Goods & Services with full PayPal buyer protection.
 
