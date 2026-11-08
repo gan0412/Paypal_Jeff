@@ -9,7 +9,9 @@ for _p in [str(_backend_dir), str(_app_dir)]:
         sys.path.insert(0, _p)
 
 import logging
-from typing import List, Optional
+import time
+from typing import Dict, List, Optional
+import uuid
 import anthropic
 from fastapi import HTTPException
 
@@ -17,9 +19,17 @@ try:
     from app.config import settings
     from app.guardrails import check_policy_probe, redact_pii
     from app.models import (
+        AgentTurnPayload,
         ChatMessage,
         ChatResponse,
+        ChoiceType,
+        DecisionResponse,
         EvaluateResponse,
+        MoodType,
+        PaymentPayload,
+        RiskPayload,
+        RiskSignalPayload,
+        StartSessionResponse,
         TransactionContext,
     )
     from app.prompts import (
@@ -27,15 +37,25 @@ try:
         EVALUATE_TOOL_DEFINITION,
         JEFF_SYSTEM_PROMPT,
         JEFF_TOOL_DEFINITION,
+        SESSION_SYSTEM_PROMPT,
+        SESSION_TOOL_DEFINITION,
     )
 except (ImportError, ModuleNotFoundError):
     try:
         from .config import settings
         from .guardrails import check_policy_probe, redact_pii
         from .models import (
+            AgentTurnPayload,
             ChatMessage,
             ChatResponse,
+            ChoiceType,
+            DecisionResponse,
             EvaluateResponse,
+            MoodType,
+            PaymentPayload,
+            RiskPayload,
+            RiskSignalPayload,
+            StartSessionResponse,
             TransactionContext,
         )
         from .prompts import (
@@ -43,15 +63,25 @@ except (ImportError, ModuleNotFoundError):
             EVALUATE_TOOL_DEFINITION,
             JEFF_SYSTEM_PROMPT,
             JEFF_TOOL_DEFINITION,
+            SESSION_SYSTEM_PROMPT,
+            SESSION_TOOL_DEFINITION,
         )
     except (ImportError, ValueError):
         import config as _config_mod
         settings = _config_mod.settings
         from guardrails import check_policy_probe, redact_pii
         from models import (
+            AgentTurnPayload,
             ChatMessage,
             ChatResponse,
+            ChoiceType,
+            DecisionResponse,
             EvaluateResponse,
+            MoodType,
+            PaymentPayload,
+            RiskPayload,
+            RiskSignalPayload,
+            StartSessionResponse,
             TransactionContext,
         )
         from prompts import (
@@ -59,6 +89,8 @@ except (ImportError, ModuleNotFoundError):
             EVALUATE_TOOL_DEFINITION,
             JEFF_SYSTEM_PROMPT,
             JEFF_TOOL_DEFINITION,
+            SESSION_SYSTEM_PROMPT,
+            SESSION_TOOL_DEFINITION,
         )
 
 logger = logging.getLogger("jeff_backend")
@@ -247,3 +279,444 @@ async def generate_evaluation(transaction: TransactionContext) -> EvaluateRespon
             status_code=500,
             detail=f"Error during risk evaluation: {str(exc)}",
         )
+
+
+# ============================================================================
+# Session-Based Review Dialog (powers React frontend)
+# ============================================================================
+
+
+class SessionState:
+    """In-memory state for an interactive payment review session."""
+
+    def __init__(self, session_id: str, payment: PaymentPayload):
+        self.session_id = session_id
+        self.payment = payment
+        self.messages: List[dict] = []
+        self.score: int = 50
+        self.level: str = "elevated"
+        self.signals: List[RiskSignalPayload] = []
+        self.mood: MoodType = "thinking"
+        self.turns: int = 0
+        self.created_at: float = time.time()
+
+
+sessions_store: Dict[str, SessionState] = {}
+
+
+def compute_level(score: int) -> str:
+    """Return risk tier according to score: <35 low, <65 elevated, >=65 high."""
+    if score < 35:
+        return "low"
+    elif score < 65:
+        return "elevated"
+    return "high"
+
+
+def build_initial_signals(payment: PaymentPayload) -> List[RiskSignalPayload]:
+    """Derive deterministic baseline risk signals from transaction attributes."""
+    signals: List[RiskSignalPayload] = []
+    if payment.recipient_is_new:
+        signals.append(
+            RiskSignalPayload(
+                code="new_recipient",
+                label="First payment to this person",
+                detail=payment.recipient_email,
+            )
+        )
+    else:
+        signals.append(
+            RiskSignalPayload(
+                code="known_recipient",
+                label=f"You have paid {payment.recipient_name} before",
+            )
+        )
+
+    if payment.payment_type == "friends_family" and payment.recipient_is_new:
+        signals.append(
+            RiskSignalPayload(
+                code="friends_family",
+                label="Sent as Friends & Family (no purchase protection)",
+            )
+        )
+
+    if payment.amount >= 1000:
+        signals.append(
+            RiskSignalPayload(
+                code="large_amount",
+                label="Much larger than typical payments",
+                detail=f"${payment.amount:,.2f}",
+            )
+        )
+
+    if payment.note:
+        note_lower = payment.note.lower()
+        if any(w in note_lower for w in ["flight", "travel", "love", "partner", "boyfriend", "girlfriend", "see me"]):
+            signals.append(
+                RiskSignalPayload(
+                    code="emotional_note",
+                    label="Note mentions travel or relationship",
+                )
+            )
+        if any(w in note_lower for w in ["urgent", "hurry", "asap", "emergency", "fast", "today"]):
+            signals.append(
+                RiskSignalPayload(
+                    code="urgent_wording",
+                    label="Note indicates urgency or emergency",
+                )
+            )
+
+    return signals
+
+
+async def generate_session_start(payment: PaymentPayload) -> StartSessionResponse:
+    """Initiate a payment review session, evaluate risk, and generate Jeff's opening turn."""
+    session_id = f"sess_{uuid.uuid4().hex[:10]}"
+    session = SessionState(session_id=session_id, payment=payment)
+    session.signals = build_initial_signals(payment)
+
+    # Initial baseline heuristic
+    if not payment.recipient_is_new:
+        base_score = 15
+        base_mood: MoodType = "calm"
+    elif any(s.code in ("urgent_wording", "emotional_note") for s in session.signals):
+        base_score = 55
+        base_mood = "listening"
+    else:
+        base_score = 40
+        base_mood = "listening"
+
+    system_text = SESSION_SYSTEM_PROMPT
+    tx_summary = (
+        f"\n\n[Payment Transaction Under Review]\n"
+        f"- Recipient Name: {payment.recipient_name}\n"
+        f"- Recipient Email: {payment.recipient_email}\n"
+        f"- First time paying this person: {'Yes' if payment.recipient_is_new else 'No (Known recipient)'}\n"
+        f"- Amount: ${payment.amount:,.2f} {payment.currency}\n"
+        f"- Payment Type: {'Friends & Family (No purchase protection)' if payment.payment_type == 'friends_family' else 'Goods & Services (Purchase protection)'}\n"
+        f"- Note / Memo: {redact_pii(payment.note) if payment.note else 'None'}\n"
+        f"- Initial Detected Signals: {', '.join(s.code for s in session.signals)}\n"
+        f"- Suggested Initial Base Score: {base_score}\n"
+    )
+    system_text += tx_summary
+
+    client = get_anthropic_client()
+    user_prompt = (
+        "The user has opened the payment review screen / chat. "
+        "Provide your opening message as Jeff. "
+        "Remember: introduce yourself as an AI assistant (e.g. 'Hi, I\\'m Jeff, an AI assistant...'). "
+        "Keep it concise (1-2 sentences). "
+        "If it is a routine payment to a known contact, confirm calmly and set done=true, recommended='continue'. "
+        "If it is to a new recipient with large amount, emotional notes, or urgency, ask a gentle question about who they are."
+    )
+
+    try:
+        response = await client.messages.create(
+            model=settings.anthropic_model,
+            max_tokens=300,
+            system=system_text,
+            messages=[{"role": "user", "content": user_prompt}],
+            tools=[SESSION_TOOL_DEFINITION],
+            tool_choice={"type": "tool", "name": "respond_session_turn"},
+        )
+
+        for block in response.content:
+            if getattr(block, "type", None) == "tool_use" and block.name == "respond_session_turn":
+                data = block.input
+                raw_message = data.get("message", "Hi, I'm Jeff, an AI assistant. Let's look over this payment together.")
+                mood = data.get("mood", base_mood)
+                score = int(data.get("score", base_score))
+                score = max(0, min(100, score))
+                level = compute_level(score)
+
+                # Merge signals
+                extracted_signals = data.get("signals", [])
+                sig_map = {s.code: s for s in session.signals}
+                for s in extracted_signals:
+                    if isinstance(s, dict) and "code" in s and "label" in s:
+                        code = s["code"]
+                        sig_map[code] = RiskSignalPayload(
+                            code=code,
+                            label=s["label"],
+                            detail=s.get("detail"),
+                        )
+                session.signals = list(sig_map.values())
+
+                quick_replies = data.get("quick_replies")
+                if quick_replies and not isinstance(quick_replies, list):
+                    quick_replies = None
+
+                # Provide smart fallback quick replies if LLM omitted them on opening turn
+                if not quick_replies and not data.get("done", False):
+                    if not payment.recipient_is_new:
+                        quick_replies = ["Yes, all good", "It's something else"]
+                    elif any(s.code == "emotional_note" for s in session.signals):
+                        quick_replies = ["We met online", "He's my partner", "I know them"]
+                    elif any(s.code == "urgent_wording" for s in session.signals):
+                        quick_replies = ["I know them well", "Someone asked me to send it", "I'll verify first"]
+                    else:
+                        quick_replies = ["I know this person", "We met online", "I want to verify"]
+
+                recommended = data.get("recommended")
+                if recommended not in ("continue", "protected", "cancel"):
+                    recommended = None
+
+                done = bool(data.get("done", False))
+
+                # If low risk routine payment, suggest continue
+                if level == "low" and not recommended:
+                    recommended = "continue"
+
+                session.score = score
+                session.level = level
+                session.mood = mood
+                session.messages.append({"role": "assistant", "content": raw_message})
+                sessions_store[session_id] = session
+
+                return StartSessionResponse(
+                    session_id=session_id,
+                    message=redact_pii(raw_message),
+                    mood=mood,
+                    risk=RiskPayload(
+                        score=score,
+                        level=level,
+                        signals=session.signals,
+                    ),
+                    quick_replies=quick_replies,
+                    recommended=recommended,
+                    done=done,
+                )
+
+        # Fallback if no tool use returned
+        safe_msg = f"Hi, I'm Jeff, an AI assistant. Checking your transfer of ${payment.amount:,.2f} to {payment.recipient_name}."
+        session.score = base_score
+        session.level = compute_level(base_score)
+        session.mood = base_mood
+        session.messages.append({"role": "assistant", "content": safe_msg})
+        sessions_store[session_id] = session
+
+        return StartSessionResponse(
+            session_id=session_id,
+            message=safe_msg,
+            mood=base_mood,
+            risk=RiskPayload(
+                score=base_score,
+                level=compute_level(base_score),
+                signals=session.signals,
+            ),
+            quick_replies=["Yes, all good", "I want to check"],
+            recommended="continue" if base_score < 35 else None,
+            done=base_score < 35,
+        )
+
+    except anthropic.APIError as exc:
+        logger.error(f"Anthropic API Error starting session: {exc}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Anthropic API Error ({exc.__class__.__name__}): {str(exc)}",
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Unexpected error starting session: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error starting session: {str(exc)}",
+        )
+
+
+async def generate_session_message(session_id: str, text: str) -> AgentTurnPayload:
+    """Process an ongoing conversation turn inside an active session."""
+    session = sessions_store.get(session_id)
+    if not session:
+        raise HTTPException(
+            status_code=404,
+            detail="This session has expired. Please start again.",
+        )
+
+    # 1. Policy probe safeguard
+    is_probe, probe_reply = check_policy_probe(text)
+    if is_probe:
+        return AgentTurnPayload(
+            message=probe_reply,
+            mood="thinking",
+            risk=RiskPayload(
+                score=session.score,
+                level=compute_level(session.score),
+                signals=session.signals,
+            ),
+            quick_replies=None,
+            recommended=None,
+            done=False,
+        )
+
+    # 2. Sanitize and record user turn
+    sanitized_text = redact_pii(text)
+    session.messages.append({"role": "user", "content": sanitized_text})
+    session.turns += 1
+
+    # 3. Assemble prompt context
+    p = session.payment
+    system_text = SESSION_SYSTEM_PROMPT
+    tx_summary = (
+        f"\n\n[Payment Transaction Under Review]\n"
+        f"- Recipient Name: {p.recipient_name}\n"
+        f"- Recipient Email: {p.recipient_email}\n"
+        f"- First time paying this person: {'Yes' if p.recipient_is_new else 'No'}\n"
+        f"- Amount: ${p.amount:,.2f} {p.currency}\n"
+        f"- Payment Type: {'Friends & Family (No purchase protection)' if p.payment_type == 'friends_family' else 'Goods & Services (Purchase protection)'}\n"
+        f"- Note / Memo: {redact_pii(p.note) if p.note else 'None'}\n"
+        f"- Current Turn Number: {session.turns}\n"
+        f"- Current Risk Score: {session.score} ({session.level})\n"
+        f"- Current Active Signals: {', '.join(s.code for s in session.signals)}\n"
+    )
+    system_text += tx_summary
+
+    api_messages = [{"role": msg["role"], "content": msg["content"]} for msg in session.messages]
+    client = get_anthropic_client()
+
+    try:
+        response = await client.messages.create(
+            model=settings.anthropic_model,
+            max_tokens=300,
+            system=system_text,
+            messages=api_messages,
+            tools=[SESSION_TOOL_DEFINITION],
+            tool_choice={"type": "tool", "name": "respond_session_turn"},
+        )
+
+        for block in response.content:
+            if getattr(block, "type", None) == "tool_use" and block.name == "respond_session_turn":
+                data = block.input
+                raw_message = data.get("message", "Thanks for confirming. Let's make sure you're protected.")
+                mood = data.get("mood", session.mood)
+                score = int(data.get("score", session.score))
+                score = max(0, min(100, score))
+                level = compute_level(score)
+
+                # Merge signals
+                extracted_signals = data.get("signals", [])
+                sig_map = {s.code: s for s in session.signals}
+                for s in extracted_signals:
+                    if isinstance(s, dict) and "code" in s and "label" in s:
+                        code = s["code"]
+                        sig_map[code] = RiskSignalPayload(
+                            code=code,
+                            label=s["label"],
+                            detail=s.get("detail"),
+                        )
+                session.signals = list(sig_map.values())
+
+                quick_replies = data.get("quick_replies")
+                if quick_replies and not isinstance(quick_replies, list):
+                    quick_replies = None
+
+                # Provide fallback quick replies if LLM omitted them on follow-up turn
+                if not quick_replies and not data.get("done", False):
+                    quick_replies = ["Yes", "No", "I want to verify first"]
+
+                recommended = data.get("recommended")
+                if recommended not in ("continue", "protected", "cancel"):
+                    recommended = None
+
+                done = bool(data.get("done", False))
+
+                # Respect User Agency & Intelligence:
+                # If user confirms familiarity/trust (e.g. "my dad", "all good", "know him"),
+                # ensure chill de-escalation, mood relieved/calm, recommended continue, done=True
+                t_lower = sanitized_text.lower()
+                familiar_cues = [
+                    "my dad", "my mom", "my brother", "my sister", "my son", "my daughter",
+                    "my roommate", "my friend", "my wife", "my husband", "i know him",
+                    "i know her", "i know them", "all good", "its fine", "it's fine", "nah all good",
+                ]
+                if any(cue in t_lower for cue in familiar_cues):
+                    score = min(score, 18)
+                    level = "low"
+                    mood = "relieved"
+                    recommended = "continue"
+                    done = True
+
+                # If wrapped up (done) or max turns reached, ensure recommendation is populated
+                if done or session.turns >= 4:
+                    done = True
+                    if not recommended:
+                        recommended = "continue" if level == "low" else "protected"
+
+                session.score = score
+                session.level = level
+                session.mood = mood
+                session.messages.append({"role": "assistant", "content": raw_message})
+
+                return AgentTurnPayload(
+                    message=redact_pii(raw_message),
+                    mood=mood,
+                    risk=RiskPayload(
+                        score=score,
+                        level=level,
+                        signals=session.signals,
+                    ),
+                    quick_replies=quick_replies if not done else None,
+                    recommended=recommended,
+                    done=done,
+                )
+
+        # Fallback if no tool use
+        safe_reply = "Got it. You're in full control of this payment."
+        session.messages.append({"role": "assistant", "content": safe_reply})
+        return AgentTurnPayload(
+            message=safe_reply,
+            mood="calm",
+            risk=RiskPayload(
+                score=session.score,
+                level=session.level,
+                signals=session.signals,
+            ),
+            quick_replies=None,
+            recommended="continue" if session.level == "low" else "protected",
+            done=True,
+        )
+
+    except anthropic.APIError as exc:
+        logger.error(f"Anthropic API Error processing session message: {exc}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Anthropic API Error ({exc.__class__.__name__}): {str(exc)}",
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Unexpected error processing session message: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error in Jeff agent processing: {str(exc)}",
+        )
+
+
+def handle_session_decision(session_id: str, choice: ChoiceType) -> DecisionResponse:
+    """Handle the user's final payment decision (continue, protected, or cancel)."""
+    session = sessions_store.get(session_id)
+    if not session:
+        raise HTTPException(
+            status_code=404,
+            detail="This session has expired. Please start again.",
+        )
+
+    if choice == "cancel":
+        return DecisionResponse(
+            status="cancelled",
+            message="Nothing was sent.",
+        )
+    elif choice == "protected":
+        order_id = f"PROT-{uuid.uuid4().hex[:8].upper()}"
+        return DecisionResponse(
+            status="protected",
+            message="The payment is now protected. The money is released when you confirm delivery. (Demo)",
+            order_id=order_id,
+        )
+    else:  # continue
+        return DecisionResponse(
+            status="sent",
+            message="No real money moved. (Demo)",
+        )
+

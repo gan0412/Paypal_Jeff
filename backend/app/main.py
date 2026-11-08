@@ -17,37 +17,73 @@ from fastapi.responses import JSONResponse
 try:
     from app import __version__
     from app.config import settings
-    from app.jeff_core import generate_chat_response, generate_evaluation
+    from app.jeff_core import (
+        generate_chat_response,
+        generate_evaluation,
+        generate_session_message,
+        generate_session_start,
+        handle_session_decision,
+    )
     from app.models import (
+        AgentTurnPayload,
         ChatRequest,
         ChatResponse,
+        DecisionRequest,
+        DecisionResponse,
         EvaluateRequest,
         EvaluateResponse,
         HealthResponse,
+        SendMessageRequest,
+        StartSessionRequest,
+        StartSessionResponse,
     )
 except (ImportError, ModuleNotFoundError):
     try:
         from . import __version__
         from .config import settings
-        from .jeff_core import generate_chat_response, generate_evaluation
+        from .jeff_core import (
+            generate_chat_response,
+            generate_evaluation,
+            generate_session_message,
+            generate_session_start,
+            handle_session_decision,
+        )
         from .models import (
+            AgentTurnPayload,
             ChatRequest,
             ChatResponse,
+            DecisionRequest,
+            DecisionResponse,
             EvaluateRequest,
             EvaluateResponse,
             HealthResponse,
+            SendMessageRequest,
+            StartSessionRequest,
+            StartSessionResponse,
         )
     except (ImportError, ValueError):
         __version__ = "0.1.0"
         import config as _config_mod
         settings = _config_mod.settings
-        from jeff_core import generate_chat_response, generate_evaluation
+        from jeff_core import (
+            generate_chat_response,
+            generate_evaluation,
+            generate_session_message,
+            generate_session_start,
+            handle_session_decision,
+        )
         from models import (
+            AgentTurnPayload,
             ChatRequest,
             ChatResponse,
+            DecisionRequest,
+            DecisionResponse,
             EvaluateRequest,
             EvaluateResponse,
             HealthResponse,
+            SendMessageRequest,
+            StartSessionRequest,
+            StartSessionResponse,
         )
 
 # Configure logging
@@ -137,6 +173,41 @@ async def evaluate_transaction(request: EvaluateRequest):
     a gentle proactive warning badge before the user authorizes payment.
     """
     return await generate_evaluation(transaction=request.transaction)
+
+
+# ============================================================================
+# Session API (Frontend Contract: docs/API_CONTRACT.md)
+# ============================================================================
+
+
+@app.post(
+    "/api/session/start",
+    response_model=StartSessionResponse,
+    summary="Start an interactive payment review session",
+)
+async def start_session(request: StartSessionRequest):
+    """Initiates a payment review session. Analyzes payment risk and returns Jeff's opening turn."""
+    return await generate_session_start(request.payment)
+
+
+@app.post(
+    "/api/session/{session_id}/message",
+    response_model=AgentTurnPayload,
+    summary="Send a message in an active session",
+)
+async def send_session_message(session_id: str, request: SendMessageRequest):
+    """Processes user response in the review dialog with Claude Haiku."""
+    return await generate_session_message(session_id=session_id, text=request.text)
+
+
+@app.post(
+    "/api/session/{session_id}/decision",
+    response_model=DecisionResponse,
+    summary="Record user decision (continue, protected, or cancel)",
+)
+async def decide_session(session_id: str, request: DecisionRequest):
+    """Finalizes transaction choice: continue as is, convert to protected, or cancel."""
+    return handle_session_decision(session_id=session_id, choice=request.choice)
 
 
 if __name__ == "__main__":
