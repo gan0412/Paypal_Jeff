@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { api, usingMock } from './api';
+import { api } from './api';
 import { ChatWidget } from './components/ChatWidget';
 import { ReviewStep } from './components/ReviewStep';
 import { SendStep } from './components/SendStep';
@@ -130,7 +130,6 @@ export default function App() {
         <div className="nav-in">
           <div className="brand"><span className="mark" aria-hidden="true"><i /><i /></span><span>SamplePay</span></div>
           <div className="nav-right">
-            <span className="demo-badge">{usingMock ? 'Demo · sample data' : 'Connected to backend'}</span>
             <span className="me" aria-label="Signed in as Maya R. (sample)">MR</span>
           </div>
         </div>
@@ -161,8 +160,6 @@ export default function App() {
             </div>
           </div>
         )}
-
-        <p className="foot">Prototype with a PayPal-inspired look. Not an official PayPal product. Sample data only.</p>
       </main>
 
       {step !== 'result' && (
