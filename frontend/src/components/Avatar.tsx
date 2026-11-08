@@ -127,7 +127,7 @@ export function Avatar({ mood, speaking = false, busy = false, size = 120 }: Pro
   const label = busy ? 'typing' : speaking ? 'speaking' : mood;
 
   return (
-    <div className={`avatar ${busy ? 'busy' : ''} ${speaking ? 'speaking' : ''}`} style={{ width: size, height: size }}>
+    <div className={`avatar ${mood === 'concerned' ? 'concerned' : ''} ${busy ? 'busy' : ''} ${speaking ? 'speaking' : ''}`} style={{ width: size, height: size }}>
       <svg viewBox="0 0 200 200" role="img" aria-label={`Jeff, an AI assistant, ${label}`}>
         <defs>
           <radialGradient id={`${uid}-bg`} cx="50%" cy="40%" r="75%">

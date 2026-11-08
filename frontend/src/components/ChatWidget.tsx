@@ -81,6 +81,8 @@ export function ChatWidget(p: Props) {
   };
 
   const faceMood: Mood = busy || !turn ? 'thinking' : text.trim() && !speaking ? 'listening' : turn.mood;
+  const isConcerned = faceMood === 'concerned' || turn?.mood === 'concerned' || turn?.risk?.level === 'high';
+  const launcherMood: Mood = isConcerned || held ? 'concerned' : 'calm';
   const rec = turn?.recommended;
   const btn = (c: Choice, label: string) => (
     <button type="button" className={`ghost ${c} ${rec === c ? 'rec' : ''}`} onClick={() => p.onDecide(c)} disabled={busy || !turn}>
@@ -91,11 +93,21 @@ export function ChatWidget(p: Props) {
   return (
     <>
       {!open && (
-        <button type="button" className="launcher" onClick={p.onOpen} aria-label="Open chat with Jeff, an AI assistant">
-          <span className="launcher-label">{held ? 'Continue with Jeff' : 'Ask Jeff'}</span>
+        <button type="button" className={`launcher ${isConcerned ? 'has-alert' : ''}`} onClick={p.onOpen} aria-label="Open chat with Jeff, an AI assistant">
+          <span className="launcher-label">{held ? 'Continue with Jeff' : isConcerned ? '⚠️ Jeff has a warning' : 'Ask Jeff'}</span>
           <span className="launcher-face">
-            <Avatar mood={held ? 'concerned' : 'calm'} size={64} />
-            {held && <span className="dot" aria-hidden="true" />}
+            <Avatar mood={launcherMood} size={64} />
+            {isConcerned ? (
+              <span className="glaring-alert-badge" style={{ width: 26, height: 26 }} title="High risk alert" role="status" aria-label="High risk alert">
+                <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden="true">
+                  <path d="M12 2.5L1.5 21h21L12 2.5z" fill="#ffffff" />
+                  <line x1="12" y1="9" x2="12" y2="14" stroke="#ff1f1f" strokeWidth="2.5" strokeLinecap="round" />
+                  <circle cx="12" cy="17.5" r="1.3" fill="#ff1f1f" />
+                </svg>
+              </span>
+            ) : held ? (
+              <span className="dot" aria-hidden="true" />
+            ) : null}
           </span>
         </button>
       )}
@@ -103,9 +115,32 @@ export function ChatWidget(p: Props) {
       {open && (
         <section className="widget" role="dialog" aria-label="Chat with Jeff, AI assistant">
           <header className="w-head">
-            <Avatar mood={faceMood} speaking={speaking} busy={busy} size={72} />
+            <div className="w-avatar-container">
+              <Avatar mood={faceMood} speaking={speaking} busy={busy} size={72} />
+              {isConcerned && (
+                <span className="glaring-alert-badge" style={{ width: 28, height: 28 }} title="High risk warning" role="status" aria-label="High risk warning">
+                  <svg viewBox="0 0 24 24" width={18} height={18} aria-hidden="true">
+                    <path d="M12 2.5L1.5 21h21L12 2.5z" fill="#ffffff" />
+                    <line x1="12" y1="9" x2="12" y2="14" stroke="#ff1f1f" strokeWidth="2.5" strokeLinecap="round" />
+                    <circle cx="12" cy="17.5" r="1.3" fill="#ff1f1f" />
+                  </svg>
+                </span>
+              )}
+            </div>
             <div className="w-title">
-              <h2>Jeff</h2>
+              <div className="w-name-row">
+                <h2>Jeff</h2>
+                {isConcerned && (
+                  <span className="glaring-alert-tag" role="alert">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="#ffffff" aria-hidden="true">
+                      <path d="M12 2.5L1.5 21h21L12 2.5z" />
+                      <line x1="12" y1="9" x2="12" y2="14" stroke="#ff1f1f" strokeWidth="2.5" strokeLinecap="round" />
+                      <circle cx="12" cy="17.5" r="1.3" fill="#ff1f1f" />
+                    </svg>
+                    Risk Warning
+                  </span>
+                )}
+              </div>
               <span className="ai-badge">AI assistant</span>
             </div>
             {hasSpeech && (
