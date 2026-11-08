@@ -379,12 +379,12 @@ async def generate_session_start(payment: PaymentPayload) -> StartSessionRespons
     if not payment.recipient_is_new:
         base_score = 15
         base_mood: MoodType = "calm"
-    elif any(s.code in ("urgent_wording", "emotional_note") for s in session.signals):
-        base_score = 55
-        base_mood = "listening"
+    elif any(s.code in ("urgent_wording", "emotional_note") for s in session.signals) or (payment.recipient_is_new and payment.payment_type == "friends_family"):
+        base_score = 72
+        base_mood = "concerned"
     else:
-        base_score = 40
-        base_mood = "listening"
+        base_score = 45
+        base_mood = "thinking"
 
     system_text = SESSION_SYSTEM_PROMPT
     tx_summary = (
@@ -402,12 +402,13 @@ async def generate_session_start(payment: PaymentPayload) -> StartSessionRespons
 
     client = get_anthropic_client()
     user_prompt = (
-        "The user has opened the payment review screen / chat. "
-        "Provide your opening message as Jeff. "
+        "The user has opened the payment review screen. "
+        "Provide your opening evaluation message as Jeff. "
         "Remember: introduce yourself as an AI assistant (e.g. 'Hi, I\\'m Jeff, an AI assistant...'). "
         "Keep it concise (1-2 sentences). "
-        "If it is a routine payment to a known contact, confirm calmly and set done=true, recommended='continue'. "
-        "If it is to a new recipient with large amount, emotional notes, or urgency, ask a gentle question about who they are."
+        "If there are scam markers (first-time recipient with romance/travel notes, urgency, or Friends & Family without buyer protection), "
+        "treat this as HIGH risk (score >= 65), set mood='concerned', and advise caution before sending. "
+        "If it is a routine payment to a known contact, confirm calmly (score < 35, mood='calm', done=true, recommended='continue')."
     )
 
     try:
@@ -424,10 +425,16 @@ async def generate_session_start(payment: PaymentPayload) -> StartSessionRespons
             if getattr(block, "type", None) == "tool_use" and block.name == "respond_session_turn":
                 data = block.input
                 raw_message = data.get("message", "Hi, I'm Jeff, an AI assistant. Let's look over this payment together.")
-                mood = data.get("mood", base_mood)
                 score = int(data.get("score", base_score))
                 score = max(0, min(100, score))
                 level = compute_level(score)
+                mood = data.get("mood", base_mood)
+
+                # Strict risk-driven behavioral model from AGENTS.md:
+                if level == "high":
+                    mood = "concerned"
+                elif level == "low" and mood == "concerned":
+                    mood = "calm"
 
                 # Merge signals
                 extracted_signals = data.get("signals", [])

@@ -28,8 +28,8 @@ export default function App() {
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : 'Something went wrong.');
 
-  async function startSession(p: Payment = payment) {
-    if (starting.current) return;
+  async function startSession(p: Payment = payment): Promise<AgentTurn | null> {
+    if (starting.current) return null;
     starting.current = true;
     setBusy(true); setError(null);
     sessionKey.current = JSON.stringify(p);
@@ -39,9 +39,11 @@ export default function App() {
       setSessionId(r.session_id);
       setMessages([{ id: nextId.current++, from: 'jeff', text: r.message }]);
       setTurn(r);
+      return r;
     } catch (e) {
       sessionKey.current = '';
       fail(e);
+      return null;
     } finally {
       starting.current = false;
       setBusy(false);
@@ -54,9 +56,43 @@ export default function App() {
     if (sessionKey.current !== JSON.stringify(payment)) void startSession();
   }
 
-  function sendPayment() {
-    setHeld(true);       // the payment is held until the user decides in the chat
-    openChat();
+  function handleNext() {
+    setStep('review');
+    // Evaluate payment in the background without automatically opening the chatbox
+    if (sessionKey.current !== JSON.stringify(payment)) {
+      void startSession(payment);
+    }
+  }
+
+  function handlePaymentChange(p: Payment) {
+    setPayment(p);
+    if (sessionKey.current !== JSON.stringify(p)) {
+      setTurn(null);
+      setSessionId(null);
+      setHeld(false);
+    }
+  }
+
+  async function sendPayment() {
+    let currentTurn = turn;
+    if (sessionKey.current !== JSON.stringify(payment) || !currentTurn) {
+      currentTurn = await startSession(payment);
+    }
+
+    const isRisk = currentTurn?.mood === 'concerned' || currentTurn?.risk?.level === 'high';
+
+    if (isRisk) {
+      // High-risk transaction: hold the payment, but DO NOT force-open the chat
+      setHeld(true);
+    } else {
+      // Low-risk / verified transaction: proceed with sending
+      if (sessionId) {
+        await decide('continue');
+      } else {
+        setResult({ status: 'sent', message: 'No real money moved. (Demo)' });
+        setStep('result');
+      }
+    }
   }
 
   async function send(text: string) {
@@ -97,7 +133,7 @@ export default function App() {
       </nav>
 
       <main className="app">
-        {step === 'send' && <SendStep payment={payment} onChange={setPayment} onNext={() => setStep('review')} />}
+        {step === 'send' && <SendStep payment={payment} onChange={handlePaymentChange} onNext={handleNext} />}
 
         {step === 'review' && (
           <ReviewStep payment={payment} held={held} chatOpen={chatOpen}

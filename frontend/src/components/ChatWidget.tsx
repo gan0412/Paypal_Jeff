@@ -82,7 +82,7 @@ export function ChatWidget(p: Props) {
 
   const faceMood: Mood = busy || !turn ? 'thinking' : text.trim() && !speaking ? 'listening' : turn.mood;
   const isConcerned = faceMood === 'concerned' || turn?.mood === 'concerned' || turn?.risk?.level === 'high';
-  const launcherMood: Mood = isConcerned || held ? 'concerned' : 'calm';
+  const launcherMood: Mood = isConcerned || held ? 'concerned' : (busy ? 'thinking' : 'calm');
   const rec = turn?.recommended;
   const btn = (c: Choice, label: string) => (
     <button type="button" className={`ghost ${c} ${rec === c ? 'rec' : ''}`} onClick={() => p.onDecide(c)} disabled={busy || !turn}>
@@ -93,11 +93,11 @@ export function ChatWidget(p: Props) {
   return (
     <>
       {!open && (
-        <button type="button" className={`launcher ${isConcerned ? 'has-alert' : ''}`} onClick={p.onOpen} aria-label="Open chat with Jeff, an AI assistant">
-          <span className="launcher-label">{held ? 'Continue with Jeff' : isConcerned ? '⚠️ Jeff has a warning' : 'Ask Jeff'}</span>
+        <button type="button" className={`launcher ${isConcerned || held ? 'has-alert' : ''}`} onClick={p.onOpen} aria-label="Open chat with Jeff, an AI assistant">
+          <span className="launcher-label">{held ? '⚠️ Continue with Jeff' : isConcerned ? '⚠️ Jeff has a warning' : 'Ask Jeff'}</span>
           <span className="launcher-face">
             <Avatar mood={launcherMood} size={64} />
-            {isConcerned ? (
+            {isConcerned || held ? (
               <span className="glaring-alert-badge" style={{ width: 26, height: 26 }} title="High risk alert" role="status" aria-label="High risk alert">
                 <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden="true">
                   <path d="M12 2.5L1.5 21h21L12 2.5z" fill="#ffffff" />
@@ -105,8 +105,6 @@ export function ChatWidget(p: Props) {
                   <circle cx="12" cy="17.5" r="1.3" fill="#ff1f1f" />
                 </svg>
               </span>
-            ) : held ? (
-              <span className="dot" aria-hidden="true" />
             ) : null}
           </span>
         </button>
