@@ -700,7 +700,7 @@ async def generate_session_message(session_id: str, text: str) -> AgentTurnPaylo
         )
 
 
-def handle_session_decision(session_id: str, choice: ChoiceType) -> DecisionResponse:
+def handle_session_decision(session_id: str, choice: ChoiceType, order_id: Optional[str] = None) -> DecisionResponse:
     """Handle the user's final payment decision (continue, protected, or cancel)."""
     session = sessions_store.get(session_id)
     if not session:
@@ -715,15 +715,16 @@ def handle_session_decision(session_id: str, choice: ChoiceType) -> DecisionResp
             message="Nothing was sent.",
         )
     elif choice == "protected":
-        order_id = f"PROT-{uuid.uuid4().hex[:8].upper()}"
+        oid = order_id or f"PROT-{uuid.uuid4().hex[:8].upper()}"
         return DecisionResponse(
             status="protected",
-            message="The payment is now protected. The money is released when you confirm delivery. (Demo)",
-            order_id=order_id,
+            message="The payment is now protected. The money is released when you confirm delivery.",
+            order_id=oid,
         )
     else:  # continue
         return DecisionResponse(
             status="sent",
-            message="No real money moved. (Demo)",
+            message="Payment completed successfully.",
+            order_id=order_id,
         )
 

@@ -207,7 +207,7 @@ async def send_session_message(session_id: str, request: SendMessageRequest):
 )
 async def decide_session(session_id: str, request: DecisionRequest):
     """Finalizes transaction choice: continue as is, convert to protected, or cancel."""
-    return handle_session_decision(session_id=session_id, choice=request.choice)
+    return handle_session_decision(session_id=session_id, choice=request.choice, order_id=request.order_id)
 
 
 if __name__ == "__main__":

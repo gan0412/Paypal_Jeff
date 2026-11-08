@@ -244,7 +244,7 @@ export const mockApi = {
     return turn(s, high ? sc.closing.high : sc.closing.low, high ? 'concerned' : 'relieved', undefined, true);
   },
 
-  async decide(sessionId: string, choice: Choice): Promise<DecisionResult> {
+  async decide(sessionId: string, choice: Choice, order_id?: string): Promise<DecisionResult> {
     await sleep(500);
     if (!sessions.has(sessionId)) throw new Error('This session has expired. Please start again.');
     if (choice === 'cancel')
@@ -252,9 +252,13 @@ export const mockApi = {
     if (choice === 'protected')
       return {
         status: 'protected',
-        message: 'The money is released when you confirm. (Demo)',
-        order_id: 'DEMO-ORDER-1042',
+        message: 'The money is released when you confirm delivery.',
+        order_id: order_id || 'DEMO-ORDER-1042',
       };
-    return { status: 'sent', message: 'No real money moved. (Demo)' };
+    return {
+      status: 'sent',
+      message: order_id ? 'Payment authorized successfully via PayPal.' : 'Payment completed successfully.',
+      order_id,
+    };
   },
 };

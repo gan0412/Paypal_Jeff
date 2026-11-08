@@ -30,7 +30,8 @@ async function call<T>(path: string, body: unknown): Promise<T> {
 const realApi = {
   startSession: (payment: Payment) => call<StartResponse>('/session/start', { payment }),
   sendMessage: (id: string, text: string) => call<AgentTurn>(`/session/${id}/message`, { text }),
-  decide: (id: string, choice: Choice) => call<DecisionResult>(`/session/${id}/decision`, { choice }),
+  decide: (id: string, choice: Choice, order_id?: string) =>
+    call<DecisionResult>(`/session/${id}/decision`, { choice, order_id }),
 };
 
 export const api = USE_MOCK ? mockApi : realApi;
