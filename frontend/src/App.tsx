@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { PayPalScriptProvider } from '@paypal/react-paypal-js';
 import { api } from './api';
 import { ChatWidget } from './components/ChatWidget';
 import { ReviewStep } from './components/ReviewStep';
@@ -8,6 +9,15 @@ import { PRESETS } from './scenarios';
 import type { AgentTurn, ChatMessage, Choice, DecisionResult, Payment } from './types';
 
 type Step = 'send' | 'review' | 'result';
+
+const PAYPAL_CLIENT_ID = (import.meta.env.VITE_PAYPAL_CLIENT_ID as string) || 'test';
+
+const paypalOptions = {
+  clientId: PAYPAL_CLIENT_ID,
+  currency: 'USD',
+  intent: 'capture',
+  components: 'buttons',
+};
 
 export default function App() {
   const [payment, setPayment] = useState<Payment>({ ...PRESETS[0].payment });
@@ -75,24 +85,25 @@ export default function App() {
   }
 
   async function sendPayment() {
-    let currentTurn = turn;
-    if (sessionKey.current !== JSON.stringify(payment) || !currentTurn) {
-      currentTurn = await startSession(payment);
-    }
-
-    const isRisk = currentTurn?.mood === 'concerned' || currentTurn?.risk?.level === 'high';
-
-    if (isRisk) {
-      // High-risk transaction: hold the payment, but DO NOT force-open the chat
-      setHeld(true);
+    // Non-blocking: respect user agency and process payment
+    if (sessionId) {
+      await decide('continue');
     } else {
-      // Low-risk / verified transaction: proceed with sending
-      if (sessionId) {
-        await decide('continue');
-      } else {
-        setResult({ status: 'sent', message: 'No real money moved. (Demo)' });
-        setStep('result');
-      }
+      setResult({ status: 'sent', message: 'Payment completed successfully.' });
+      setStep('result');
+    }
+  }
+
+  async function handlePayPalSuccess(orderId: string) {
+    if (sessionId) {
+      await decide('continue', orderId);
+    } else {
+      setResult({
+        status: 'sent',
+        message: 'Payment authorized successfully via PayPal Sandbox.',
+        order_id: orderId,
+      });
+      setStep('result');
     }
   }
 
@@ -107,11 +118,11 @@ export default function App() {
     } catch (e) { fail(e); } finally { setBusy(false); }
   }
 
-  async function decide(choice: Choice) {
+  async function decide(choice: Choice, order_id?: string) {
     if (!sessionId) return;
     setBusy(true); setError(null);
     try {
-      setResult(await api.decide(sessionId, choice));
+      setResult(await api.decide(sessionId, choice, order_id));
       setChatOpen(false); setHeld(false); setStep('result');
     } catch (e) { fail(e); } finally { setBusy(false); }
   }
@@ -125,7 +136,7 @@ export default function App() {
   const isConcerned = (turn ? turn.mood === 'concerned' || turn.risk.level === 'high' : instantRisk.isConcerned) || held;
 
   return (
-    <>
+    <PayPalScriptProvider options={paypalOptions}>
       <nav className="nav" aria-label="Main">
         <div className="nav-in">
           <div className="brand"><span className="mark" aria-hidden="true"><i /><i /></span><span>SamplePay</span></div>
@@ -141,11 +152,12 @@ export default function App() {
         {step === 'review' && (
           <ReviewStep
             payment={payment}
-            held={held}
+            isConcerned={isConcerned}
             chatOpen={chatOpen}
-            onBack={() => { if (!held) setStep('send'); }}
+            onBack={() => setStep('send')}
             onSend={sendPayment}
             onOpenChat={openChat}
+            onPayPalSuccess={handlePayPalSuccess}
           />
         )}
 
@@ -154,7 +166,7 @@ export default function App() {
             <div className={`screen result ${result.status}`} role="status">
               <h1 className="title">{result.status === 'sent' ? 'Payment sent' : result.status === 'protected' ? 'Protected payment set up' : 'Payment cancelled'}</h1>
               <p>{result.message}</p>
-              {result.order_id && <p className="mute">Reference: {result.order_id}</p>}
+              {result.order_id && <p className="mute">PayPal Reference: {result.order_id}</p>}
               {result.approve_url && <p><a href={result.approve_url} target="_blank" rel="noopener noreferrer">Open protected checkout</a></p>}
               <button type="button" className="primary wide" onClick={reset}>Try another scenario</button>
             </div>
@@ -166,6 +178,6 @@ export default function App() {
         <ChatWidget open={chatOpen} held={held} payment={payment} messages={messages} turn={turn} busy={busy} error={error}
           onOpen={openChat} onClose={() => setChatOpen(false)} onSend={send} onDecide={decide} onRetry={() => void startSession()} />
       )}
-    </>
+    </PayPalScriptProvider>
   );
 }

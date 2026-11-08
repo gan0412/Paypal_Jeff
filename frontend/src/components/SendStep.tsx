@@ -63,11 +63,6 @@ export function SendStep({ payment, onChange, onNext }: Props) {
         <label className="field"><span>Note</span>
           <input value={payment.note} onChange={(e) => set('note', e.target.value)} /></label>
 
-        <label className="check">
-          <input type="checkbox" checked={payment.recipient_is_new} onChange={(e) => set('recipient_is_new', e.target.checked)} />
-          <span>New recipient <em>(demo)</em></span>
-        </label>
-
         <button type="submit" className="primary wide" disabled={!valid}>Next</button>
       </form>
     </div>

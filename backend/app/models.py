@@ -157,6 +157,7 @@ class DecisionRequest(BaseModel):
     """Request payload for the user's final payment decision."""
 
     choice: ChoiceType = Field(..., description="User choice: continue, protected, or cancel")
+    order_id: Optional[str] = Field(default=None, description="Optional PayPal order ID if already authorized")
 
 
 class DecisionResponse(BaseModel):

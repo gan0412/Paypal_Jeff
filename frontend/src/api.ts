@@ -17,10 +17,15 @@ async function call<T>(path: string, body: unknown): Promise<T> {
     throw new Error("Can't reach the server right now. Please try again.");
   }
   if (!res.ok) {
-    let detail = 'Something went wrong. Please try again.';
+    let detail = 'Backend server returned an error.';
     try {
-      const j = await res.json();
-      if (typeof j.detail === 'string') detail = j.detail;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const j = await res.json();
+        if (typeof j.detail === 'string') detail = j.detail;
+      } else if (res.status === 504 || res.status === 502) {
+        detail = 'Backend is not running on port 8000. Start backend in a terminal with: python run.py';
+      }
     } catch { /* keep default */ }
     throw new Error(detail);
   }
@@ -30,7 +35,8 @@ async function call<T>(path: string, body: unknown): Promise<T> {
 const realApi = {
   startSession: (payment: Payment) => call<StartResponse>('/session/start', { payment }),
   sendMessage: (id: string, text: string) => call<AgentTurn>(`/session/${id}/message`, { text }),
-  decide: (id: string, choice: Choice) => call<DecisionResult>(`/session/${id}/decision`, { choice }),
+  decide: (id: string, choice: Choice, order_id?: string) =>
+    call<DecisionResult>(`/session/${id}/decision`, { choice, order_id }),
 };
 
 export const api = USE_MOCK ? mockApi : realApi;
