@@ -9,7 +9,7 @@
 ## 💡 Product Overview (For Judges)
 
 ### The Problem: Why Static Warning Banners Fail
-In modern payment fraud, the biggest threat is no longer account takeover—it is **Authorized Push Payment (APP) fraud**. Scammers emotionally manipulate victims through manufactured urgency, fake family emergencies, romance pretexts, and fake charities into authorizing transactions themselves.
+In modern **Authorized Push Payment (APP)**, one of the biggest threats is psychological manipulation and social engineering. Scammers emotionally manipulate victims through manufactured urgency, fake family emergencies, romance pretexts, and fake charities into authorizing transactions themselves.
 
 Victims in high-stress emotional states experience **cognitive tunnel vision**: they view static caution banners and generic warning popups as annoying friction and reflexively click past them.
 
@@ -26,7 +26,7 @@ Victims in high-stress emotional states experience **cognitive tunnel vision**: 
 
 ## 🎯 Core Principles
 
-1. **Always Transparently Labeled as AI:** Jeff never impersonates a human.
+1. **Always Transparently Labeled as AI:** Jeff never impersonates a human, it only acts like a humanlike AI agent.
 2. **Advises, Never Blocks:** Jeff provides intelligence and guidance; the sender always retains full authority over their money.
 3. **Calm & Non-Judgmental:** Tone is supportive and conversational—no panic, accusatory interrogation, or alarmist friction.
 4. **Zero Policy Leakage & PII Protection:** Automated guardrails scrub credit cards, SSNs, and OTPs, and never disclose internal fraud scoring logic to prevent scammers from reverse-engineering defenses.
