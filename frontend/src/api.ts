@@ -1,5 +1,5 @@
 import { mockApi } from './mock';
-import type { AgentTurn, Choice, DecisionResult, Payment, StartResponse } from './types';
+import type { AgentTurn, Choice, Precheck, DecisionResult, Payment, StartResponse } from './types';
 
 // VITE_USE_MOCK=true (default in dev) -> built-in mock. Set to "false" to call the real backend.
 const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false';
@@ -17,15 +17,10 @@ async function call<T>(path: string, body: unknown): Promise<T> {
     throw new Error("Can't reach the server right now. Please try again.");
   }
   if (!res.ok) {
-    let detail = 'Backend server returned an error.';
+    let detail = 'Something went wrong. Please try again.';
     try {
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        const j = await res.json();
-        if (typeof j.detail === 'string') detail = j.detail;
-      } else if (res.status === 504 || res.status === 502) {
-        detail = 'Backend is not running on port 8000. Start backend in a terminal with: python run.py';
-      }
+      const j = await res.json();
+      if (typeof j.detail === 'string') detail = j.detail;
     } catch { /* keep default */ }
     throw new Error(detail);
   }
@@ -33,10 +28,10 @@ async function call<T>(path: string, body: unknown): Promise<T> {
 }
 
 const realApi = {
+  precheck: (payment: Payment) => call<Precheck>('/precheck', { payment }),
   startSession: (payment: Payment) => call<StartResponse>('/session/start', { payment }),
   sendMessage: (id: string, text: string) => call<AgentTurn>(`/session/${id}/message`, { text }),
-  decide: (id: string, choice: Choice, order_id?: string) =>
-    call<DecisionResult>(`/session/${id}/decision`, { choice, order_id }),
+  decide: (id: string, choice: Choice) => call<DecisionResult>(`/session/${id}/decision`, { choice }),
 };
 
 export const api = USE_MOCK ? mockApi : realApi;

@@ -54,8 +54,17 @@ export interface ChatMessage {
 }
 
 export interface ScenarioPreset {
-  id: 'romance' | 'charity' | 'legit';
+  id: 'romance' | 'charity' | 'legit' | 'coached' | 'influenced' | 'worried';
   label: string;
   blurb: string;
   payment: Payment;
+}
+
+// Decided before any chat: how much attention does this payment need?
+//   allow = send normally, Jeff stays out of the way
+//   check = payment held, Jeff opens quietly
+//   hold  = high risk, payment held and the screen dims while Jeff talks
+export interface Precheck {
+  action: 'allow' | 'check' | 'hold';
+  reason: string;
 }

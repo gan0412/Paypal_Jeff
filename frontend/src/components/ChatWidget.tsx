@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AgentTurn, ChatMessage, Choice, Mood, Payment } from '../types';
-import { evaluatePaymentInstant } from '../riskEvaluator';
 import { Avatar } from './Avatar';
 
 interface Props {
   open: boolean;
   held: boolean;
+  delay?: boolean;
   payment: Payment;
   messages: ChatMessage[];
   turn: AgentTurn | null;
@@ -81,11 +81,7 @@ export function ChatWidget(p: Props) {
     p.onSend(v);
   };
 
-  const instantRisk = evaluatePaymentInstant(p.payment);
-
   const faceMood: Mood = busy || !turn ? 'thinking' : text.trim() && !speaking ? 'listening' : turn.mood;
-  const isConcerned = (turn ? turn.mood === 'concerned' || turn.risk.level === 'high' : instantRisk.isConcerned) || faceMood === 'concerned' || held;
-  const launcherMood: Mood = isConcerned || held ? 'concerned' : (busy ? 'thinking' : 'calm');
   const rec = turn?.recommended;
   const btn = (c: Choice, label: string) => (
     <button type="button" className={`ghost ${c} ${rec === c ? 'rec' : ''}`} onClick={() => p.onDecide(c)} disabled={busy || !turn}>
@@ -96,52 +92,21 @@ export function ChatWidget(p: Props) {
   return (
     <>
       {!open && (
-        <button type="button" className={`launcher ${isConcerned || held ? 'has-alert' : ''}`} onClick={p.onOpen} aria-label="Open chat with Jeff, an AI assistant">
-          <span className="launcher-label">{held ? '⚠️ Continue with Jeff' : isConcerned ? '⚠️ Jeff has a warning' : 'Ask Jeff'}</span>
+        <button type="button" className="launcher" onClick={p.onOpen} aria-label="Open chat with Jeff, an AI assistant">
+          <span className="launcher-label">{held ? 'Continue with Jeff' : 'Ask Jeff'}</span>
           <span className="launcher-face">
-            <Avatar mood={launcherMood} size={64} />
-            {isConcerned || held ? (
-              <span className="glaring-alert-badge" style={{ width: 26, height: 26 }} title="High risk alert" role="status" aria-label="High risk alert">
-                <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden="true">
-                  <path d="M12 2.5L1.5 21h21L12 2.5z" fill="#ffffff" />
-                  <line x1="12" y1="9" x2="12" y2="14" stroke="#ff1f1f" strokeWidth="2.5" strokeLinecap="round" />
-                  <circle cx="12" cy="17.5" r="1.3" fill="#ff1f1f" />
-                </svg>
-              </span>
-            ) : null}
+            <Avatar mood={held ? 'concerned' : 'calm'} size={64} />
+            {held && <span className="dot" aria-hidden="true" />}
           </span>
         </button>
       )}
 
       {open && (
-        <section className="widget" role="dialog" aria-label="Chat with Jeff, AI assistant">
+        <section className="widget" role="dialog" aria-label="Chat with Jeff, AI assistant" style={p.delay ? { animationDelay: '.75s' } : undefined}>
           <header className="w-head">
-            <div className="w-avatar-container">
-              <Avatar mood={faceMood} speaking={speaking} busy={busy} size={72} />
-              {isConcerned && (
-                <span className="glaring-alert-badge" style={{ width: 28, height: 28 }} title="High risk warning" role="status" aria-label="High risk warning">
-                  <svg viewBox="0 0 24 24" width={18} height={18} aria-hidden="true">
-                    <path d="M12 2.5L1.5 21h21L12 2.5z" fill="#ffffff" />
-                    <line x1="12" y1="9" x2="12" y2="14" stroke="#ff1f1f" strokeWidth="2.5" strokeLinecap="round" />
-                    <circle cx="12" cy="17.5" r="1.3" fill="#ff1f1f" />
-                  </svg>
-                </span>
-              )}
-            </div>
+            <Avatar mood={faceMood} speaking={speaking} busy={busy} size={72} />
             <div className="w-title">
-              <div className="w-name-row">
-                <h2>Jeff</h2>
-                {isConcerned && (
-                  <span className="glaring-alert-tag" role="alert">
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="#ffffff" aria-hidden="true">
-                      <path d="M12 2.5L1.5 21h21L12 2.5z" />
-                      <line x1="12" y1="9" x2="12" y2="14" stroke="#ff1f1f" strokeWidth="2.5" strokeLinecap="round" />
-                      <circle cx="12" cy="17.5" r="1.3" fill="#ff1f1f" />
-                    </svg>
-                    Risk Warning
-                  </span>
-                )}
-              </div>
+              <h2>Jeff</h2>
               <span className="ai-badge">AI assistant</span>
             </div>
             {hasSpeech && (

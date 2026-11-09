@@ -29,6 +29,14 @@ All JSON uses **snake_case**. Base path: `/api`. Backend suggestion: FastAPI on 
   "done": false }   // true when Jeff has nothing more to ask
 ```
 
+## 0. Precheck (call first, when the user presses "Send payment now")
+`POST /api/precheck` with `{payment}` returns `{action: "allow" | "check" | "hold", reason: string}`.
+- `allow`: small, ordinary payment. The frontend sends it normally and Jeff never appears.
+- `check`: moderate. Payment is held and Jeff opens quietly.
+- `hold`: high risk (large first payment, scam-like note, far above the usual amount). Payment is held, the screen dims, Jeff opens.
+The mock uses simple rules on amount, new recipient and note wording. The real engine should compare against the
+account's own history (typical amount, past payments to this recipient).
+
 ## 1. Start a session
 
 `POST /api/session/start`  body: `{ "payment": Payment }`

@@ -1,23 +1,14 @@
 import { useRef, useState } from 'react';
-import { PayPalScriptProvider } from '@paypal/react-paypal-js';
-import { api } from './api';
+import { api, usingMock } from './api';
 import { ChatWidget } from './components/ChatWidget';
+import { Hero } from './components/Hero';
+import { ResultCard } from './components/ResultCard';
 import { ReviewStep } from './components/ReviewStep';
 import { SendStep } from './components/SendStep';
-import { evaluatePaymentInstant } from './riskEvaluator';
 import { PRESETS } from './scenarios';
 import type { AgentTurn, ChatMessage, Choice, DecisionResult, Payment } from './types';
 
 type Step = 'send' | 'review' | 'result';
-
-const PAYPAL_CLIENT_ID = (import.meta.env.VITE_PAYPAL_CLIENT_ID as string) || 'test';
-
-const paypalOptions = {
-  clientId: PAYPAL_CLIENT_ID,
-  currency: 'USD',
-  intent: 'capture',
-  components: 'buttons',
-};
 
 export default function App() {
   const [payment, setPayment] = useState<Payment>({ ...PRESETS[0].payment });
@@ -29,6 +20,9 @@ export default function App() {
   const [turn, setTurn] = useState<AgentTurn | null>(null);
   const [result, setResult] = useState<DecisionResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [strong, setStrong] = useState(false);   // high-risk hold: dim the page and flash the shield
+  const [checking, setChecking] = useState(false);
+  const [burst, setBurst] = useState(false);   // brief shield flash when a payment is put on hold
   const [error, setError] = useState<string | null>(null);
   const nextId = useRef(1);
   const sessionKey = useRef('');   // which payment the current chat session is about
@@ -39,8 +33,8 @@ export default function App() {
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : 'Something went wrong.');
 
-  async function startSession(p: Payment = payment): Promise<AgentTurn | null> {
-    if (starting.current) return null;
+  async function startSession(p: Payment = payment) {
+    if (starting.current) return;
     starting.current = true;
     setBusy(true); setError(null);
     sessionKey.current = JSON.stringify(p);
@@ -50,11 +44,9 @@ export default function App() {
       setSessionId(r.session_id);
       setMessages([{ id: nextId.current++, from: 'jeff', text: r.message }]);
       setTurn(r);
-      return r;
     } catch (e) {
       sessionKey.current = '';
       fail(e);
-      return null;
     } finally {
       starting.current = false;
       setBusy(false);
@@ -67,44 +59,23 @@ export default function App() {
     if (sessionKey.current !== JSON.stringify(payment)) void startSession();
   }
 
-  function handleNext() {
-    setStep('review');
-    // Evaluate payment in the background without automatically opening the chatbox
-    if (sessionKey.current !== JSON.stringify(payment)) {
-      void startSession(payment);
-    }
-  }
-
-  function handlePaymentChange(p: Payment) {
-    setPayment(p);
-    if (sessionKey.current !== JSON.stringify(p)) {
-      setTurn(null);
-      setSessionId(null);
-      setHeld(false);
-    }
-  }
-
+  // First ask how risky the payment is. Small, ordinary payments go straight through without Jeff.
   async function sendPayment() {
-    // Non-blocking: respect user agency and process payment
-    if (sessionId) {
-      await decide('continue');
-    } else {
-      setResult({ status: 'sent', message: 'Payment completed successfully.' });
-      setStep('result');
-    }
-  }
-
-  async function handlePayPalSuccess(orderId: string) {
-    if (sessionId) {
-      await decide('continue', orderId);
-    } else {
-      setResult({
-        status: 'sent',
-        message: 'Payment authorized successfully via PayPal Sandbox.',
-        order_id: orderId,
-      });
-      setStep('result');
-    }
+    if (checking) return;
+    setChecking(true); setError(null);
+    try {
+      const pre = await api.precheck(payment);
+      if (pre.action === 'allow') {
+        setResult({ status: 'sent', message: `${new Intl.NumberFormat('en-US', { style: 'currency', currency: payment.currency }).format(payment.amount)} sent to ${payment.recipient_name}.` });
+        setStep('result');
+        return;
+      }
+      setHeld(true);
+      const hard = pre.action === 'hold';
+      setStrong(hard);
+      if (hard) { setBurst(true); window.setTimeout(() => setBurst(false), 1500); }
+      openChat();
+    } catch (e) { fail(e); } finally { setChecking(false); }
   }
 
   async function send(text: string) {
@@ -118,66 +89,56 @@ export default function App() {
     } catch (e) { fail(e); } finally { setBusy(false); }
   }
 
-  async function decide(choice: Choice, order_id?: string) {
+  async function decide(choice: Choice) {
     if (!sessionId) return;
     setBusy(true); setError(null);
     try {
-      setResult(await api.decide(sessionId, choice, order_id));
-      setChatOpen(false); setHeld(false); setStep('result');
+      setResult(await api.decide(sessionId, choice));
+      setChatOpen(false); setHeld(false); setStrong(false); setStep('result');
     } catch (e) { fail(e); } finally { setBusy(false); }
   }
 
   const reset = () => {
-    setStep('send'); setChatOpen(false); setHeld(false); setSessionId(null); setMessages([]);
+    setStep('send'); setChatOpen(false); setHeld(false); setStrong(false); setSessionId(null); setMessages([]);
     setTurn(null); setResult(null); setError(null); setBusy(false); sessionKey.current = '';
   };
 
-  const instantRisk = evaluatePaymentInstant(payment);
-  const isConcerned = (turn ? turn.mood === 'concerned' || turn.risk.level === 'high' : instantRisk.isConcerned) || held;
-
   return (
-    <PayPalScriptProvider options={paypalOptions}>
+    <>
+      <div className="bg" aria-hidden="true"><i /><i /><i /></div>
       <nav className="nav" aria-label="Main">
         <div className="nav-in">
-          <div className="brand"><span className="mark" aria-hidden="true"><i /><i /></span><span>SamplePay</span></div>
+          <div className="brand"><span className="mark" aria-hidden="true"><i /><i /></span><span>Jeff Pal</span></div>
           <div className="nav-right">
-            <span className="me" aria-label="Signed in as Maya R. (sample)">MR</span>
+            <span className="me" aria-label="Signed in as Maya R.">MR</span>
           </div>
         </div>
       </nav>
 
-      <main className="app">
-        {step === 'send' && <SendStep payment={payment} onChange={handlePaymentChange} onNext={handleNext} />}
-
-        {step === 'review' && (
-          <ReviewStep
-            payment={payment}
-            isConcerned={isConcerned}
-            chatOpen={chatOpen}
-            onBack={() => setStep('send')}
-            onSend={sendPayment}
-            onOpenChat={openChat}
-            onPayPalSuccess={handlePayPalSuccess}
-          />
-        )}
-
-        {step === 'result' && result && (
-          <div className="flow">
-            <div className={`screen result ${result.status}`} role="status">
-              <h1 className="title">{result.status === 'sent' ? 'Payment sent' : result.status === 'protected' ? 'Protected payment set up' : 'Payment cancelled'}</h1>
-              <p>{result.message}</p>
-              {result.order_id && <p className="mute">PayPal Reference: {result.order_id}</p>}
-              {result.approve_url && <p><a href={result.approve_url} target="_blank" rel="noopener noreferrer">Open protected checkout</a></p>}
-              <button type="button" className="primary wide" onClick={reset}>Try another scenario</button>
-            </div>
-          </div>
-        )}
+      <main className={`app ${step === 'result' ? 'solo' : ''}`}>
+        {step !== 'result' && <Hero held={held} />}
+        <div className="stage">
+          {step === 'send' && <SendStep payment={payment} onChange={setPayment} onNext={() => setStep('review')} />}
+          {step === 'review' && (
+            <ReviewStep payment={payment} held={held} chatOpen={chatOpen}
+              onBack={() => { if (!held) setStep('send'); }} onSend={sendPayment} onOpenChat={openChat} />
+          )}
+          {step === 'result' && result && <ResultCard result={result} onAgain={reset} />}
+        </div>
+        <p className="foot">Built for the PayPal AI Hackathon. Prototype, not an official PayPal product.</p>
       </main>
 
+      {held && strong && chatOpen && <div className="scrim" aria-hidden="true" />}
+      {burst && (
+        <div className="burst" aria-hidden="true">
+          <svg viewBox="0 0 120 140"><path d="M60 6 12 24v42c0 33 21 58 48 68 27-10 48-35 48-68V24L60 6Z" /></svg>
+        </div>
+      )}
+
       {step !== 'result' && (
-        <ChatWidget open={chatOpen} held={held} payment={payment} messages={messages} turn={turn} busy={busy} error={error}
+        <ChatWidget open={chatOpen} held={held} delay={burst} payment={payment} messages={messages} turn={turn} busy={busy} error={error}
           onOpen={openChat} onClose={() => setChatOpen(false)} onSend={send} onDecide={decide} onRetry={() => void startSession()} />
       )}
-    </PayPalScriptProvider>
+    </>
   );
 }

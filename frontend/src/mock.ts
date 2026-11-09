@@ -1,12 +1,13 @@
 // A scripted stand-in for the real backend. Same shapes as docs/API_CONTRACT.md.
 // It exists so the UI can be built and demoed without a server. Delete nothing here when the
 // backend arrives: set VITE_USE_MOCK=false and the real API is used instead.
-import type { AgentTurn, Choice, DecisionResult, Mood, Payment, Risk, RiskSignal, StartResponse } from './types';
+import type { AgentTurn, Precheck, Choice, DecisionResult, Mood, Payment, Risk, RiskSignal, StartResponse } from './types';
 
-type ScenarioId = 'romance' | 'charity' | 'legit';
+type ScenarioId = 'romance' | 'charity' | 'legit' | 'coached' | 'influenced' | 'worried';
 
 interface Rule {
   test: RegExp;
+  when?: (p: Payment) => boolean;   // extra condition, e.g. the claim must contradict the account
   reply: string;
   mood: Mood;
   delta: number;
@@ -23,6 +24,7 @@ interface Scenario {
   rules: Rule[];
   followups: { reply: string; mood: Mood; quick?: string[] }[];
   closing: { high: string; low: string };
+  recommendHigh?: Choice;   // what Jeff suggests when risk stays high (default: protected payment)
 }
 
 const SCENARIOS: Record<ScenarioId, Scenario> = {
@@ -159,6 +161,160 @@ const SCENARIOS: Record<ScenarioId, Scenario> = {
       low: "All consistent with your usual payments. You're all set.",
     },
   },
+  // The sender repeats a story that does not match the account, or is being told what to say.
+  coached: {
+    baseScore: 42,
+    signals: [
+      { code: 'new_recipient', label: 'First payment to this person' },
+      { code: 'large_amount', label: 'Much larger than your usual payments', detail: '$3,000 vs a typical $60' },
+      { code: 'emergency_note', label: 'Note describes an emergency' },
+    ],
+    opening: "Hi, I'm Jeff, an AI assistant. This is $3,000 to someone new, marked as an emergency. Who is Marcus?",
+    openingMood: 'listening',
+    openingQuick: ['My cousin', 'A friend', 'Someone I met online'],
+    rules: [
+      {
+        test: /paid him before|sent .*before|always|every month|known him for years|many times/i,
+        when: (p) => p.recipient_is_new,
+        reply: "Thanks. I only see this as your first payment to Marcus, so something may be off. Could it be another account?",
+        mood: 'concerned', delta: 18, quick: ['Different account', 'Okay, first time'],
+        signal: { code: 'story_mismatch', label: "Answer doesn't match your account history" },
+      },
+      {
+        test: /told me (what )?to say|told me to say|said to say|tell (the )?(bank|you) (it'?s|that)|say it'?s (a )?(gift|family)|script|coach/i,
+        reply: "Thank you for telling me. If anyone gives you words to say, that's a serious warning sign by itself. You're not in trouble. Want to pause?",
+        mood: 'concerned', delta: 26, quick: ['Pause it', 'I still want to send'],
+        signal: { code: 'coached', label: 'Someone may be telling you what to say' },
+      },
+      {
+        test: /don'?t tell|secret|nobody|no one knows|private|family doesn'?t know/i,
+        reply: "Secrecy around money is a red flag, even with family. Could you call a relative on a number you already have?",
+        mood: 'concerned', delta: 14, quick: ['I will call', 'He said not to'],
+        signal: { code: 'pressure', label: 'Asked to keep this quiet' },
+      },
+      {
+        test: /texted|messaged|called me|new number|lost (my|his) phone|new phone/i,
+        reply: "A new number or phone is a classic sign. Calling his old number would settle it.",
+        mood: 'concerned', delta: 14, quick: ['I called him', "I can't reach him"],
+        signal: { code: 'new_contact', label: 'Contact came from a new number' },
+      },
+      {
+        test: /i called|called his old|confirmed|verified|spoke to|talked to him/i,
+        reply: "Good, that's the best check. If his old number confirms it, you can feel better about this.",
+        mood: 'relieved', delta: -16,
+      },
+      {
+        test: /cousin|family|relative|brother|nephew|emergency|hospital|jail|bail|accident|friend/i,
+        reply: "I'm sorry, that sounds stressful. Emergencies are the requests scammers copy most. Did he contact you, or you him?",
+        mood: 'listening', delta: 6, quick: ['He texted me', 'I called him'],
+      },
+    ],
+    followups: [{ reply: 'Could you call him on the number you already have?', mood: 'thinking' }],
+    closing: {
+      high: "I can't be sure, and I'm not accusing anyone. But the signs add up. A protected payment, or a call to a known number first, is safer.",
+      low: "That checks out. It's your call.",
+    },
+  },
+
+  // The sender is convinced and gets defensive. Jeff stays warm, stays honest, and asks for a pause.
+  influenced: {
+    baseScore: 46,
+    signals: [
+      { code: 'new_recipient', label: 'First payment to this company' },
+      { code: 'large_amount', label: 'Much larger than your usual payments', detail: '$5,000 vs a typical $60' },
+      { code: 'investment', label: 'Investment with a company you have not used before' },
+    ],
+    opening: "Hi, I'm Jeff, an AI assistant. This is $5,000 to a new trading company. How did you find them?",
+    openingMood: 'listening',
+    openingQuick: ['A friend online', 'An ad', 'I trust them'],
+    rules: [
+      {
+        test: /stop|leave me alone|don'?t tell me|mind your|none of your|not a child|i know what i'?m doing|annoy|just let me/i,
+        reply: "You're right, it's your money and your decision. I only advise and can't block it. One question, then I'll step back: would waiting 24 hours cost you anything?",
+        mood: 'calm', delta: 4, quick: ['Yes, it expires', 'No, I can wait'],
+      },
+      {
+        test: /expires|limited|today|last chance|deadline|closing|spots|window|only .*left/i,
+        reply: "That's the pressure scammers use. A real investment won't vanish in a day. Could they put the offer in writing for tomorrow?",
+        mood: 'concerned', delta: 18,
+        signal: { code: 'pressure', label: 'Pressure to act before a deadline' },
+      },
+      {
+        test: /guarantee|double|profit|returns|%|risk[- ]?free|can'?t lose|made money|dashboard|app showed|balance/i,
+        reply: "Guaranteed returns don't exist in real investing. Many scams show fake profits to get bigger deposits. Have you actually withdrawn money?",
+        mood: 'concerned', delta: 20, quick: ['Not yet', 'Yes, a small amount'],
+        signal: { code: 'too_good', label: 'Promises of guaranteed or high returns' },
+      },
+      {
+        test: /not yet|haven'?t withdrawn|fee to withdraw|tax to withdraw|unlock|release/i,
+        reply: "A fee to get your own money out is a major red flag. I'd pause here, and I'd talk to someone you trust first.",
+        mood: 'concerned', delta: 18,
+        signal: { code: 'withdraw_fee', label: 'Cannot withdraw without paying more' },
+      },
+      {
+        test: /friend|online|telegram|whatsapp|instagram|coach|mentor|advisor|broker|ad\b|facebook|dm\b/i,
+        reply: "Thanks for telling me. Have you met this person in real life?",
+        mood: 'listening', delta: 8, quick: ['No', 'Yes'],
+        signal: { code: 'online_advisor', label: 'Advisor found online and never met' },
+      },
+      {
+        test: /trust|safe|legit|licensed|regulated|registered|sure/i,
+        reply: "I hear you. A quick check can help: is the firm listed with a regulator such as the SEC? Want to look together?",
+        mood: 'thinking', delta: 3,
+      },
+    ],
+    followups: [{ reply: 'Would you try waiting a day, or a very small test first?', mood: 'thinking' }],
+    closing: {
+      high: "I can't stop you, and I won't judge. But several signs match investment scams. A protected payment gives you a way back if something is wrong.",
+      low: "That sounds reasonable. It's your call.",
+    },
+  },
+
+  // The sender is not the target. They are trying to protect someone else.
+  worried: {
+    baseScore: 52,
+    signals: [
+      { code: 'known_recipient', label: 'You have paid Ray 6 times before' },
+      { code: 'prize_fee', label: "Note mentions a 'prize fee'" },
+    ],
+    opening: "Hi, I'm Jeff, an AI assistant. This payment mentions a prize fee. Are you worried about Ray?",
+    openingMood: 'listening',
+    openingQuick: ["Yes, I think he's being scammed", 'He asked me to pay it'],
+    recommendHigh: 'cancel',
+    rules: [
+      {
+        test: /scam|scammed|worried|suspect|tricked|won something|prize|lottery|sweepstakes/i,
+        reply: "You're right to worry. A fee to claim a prize is a classic scam. Please don't send it. How is Ray doing, does he seem pressured?",
+        mood: 'concerned', delta: 14, quick: ['He is very excited', "He's stressed"],
+        signal: { code: 'advance_fee', label: 'Fee required to claim a prize' },
+      },
+      {
+        test: /excited|obsess|only talks|defend|angry|won'?t listen|insists|believes|trusts them/i,
+        reply: "That's common. People in a scam often defend it, and arguing can push them closer. Try asking, 'who contacted you?' instead of saying it's a scam.",
+        mood: 'listening', delta: 4, quick: ['What else can I do?'],
+      },
+      {
+        test: /stressed|scared|threat|afraid|arrest|owe|debt|ashamed/i,
+        reply: "Thank you for caring. He may be ashamed or afraid, so staying kind matters. Could you sit down with him in person, or call?",
+        mood: 'concerned', delta: 6, quick: ['What else can I do?'],
+      },
+      {
+        test: /asked me|he asked|wants me to pay|sent me|for him/i,
+        reply: "Thanks. I'd hold off. If you pay, the scammer will likely ask for more. Could you talk to Ray first?",
+        mood: 'concerned', delta: 12,
+      },
+      {
+        test: /what else|what can i do|help|how do i|next|report/i,
+        reply: "Three steps: pause any payments, ask him to stop replying to them, and call his bank together. You can report it at reportfraud.ftc.gov. Want to cancel this payment?",
+        mood: 'calm', delta: 4,
+      },
+    ],
+    followups: [{ reply: 'Has Ray sent money to them already?', mood: 'listening', quick: ['Yes', 'Not sure'] }],
+    closing: {
+      high: 'Cancelling is the kind choice here. Talking to Ray calmly, in person if you can, is the best next step.',
+      low: "Okay. It's your call.",
+    },
+  },
 };
 
 interface Session {
@@ -170,6 +326,13 @@ interface Session {
   followupIdx: number;
   turns: number;
 }
+
+// Gentle probes for answers the script does not recognise. Jeff acknowledges, then asks something open.
+const FALLBACKS: { reply: string; mood: Mood }[] = [
+  { reply: 'Thanks for sharing that. Could you tell me a bit more about how this started?', mood: 'listening' },
+  { reply: "I appreciate you being open with me. Is there anything about this that feels rushed or uncomfortable?", mood: 'listening' },
+  { reply: 'That helps. If a friend were in your place, what would you tell them to do?', mood: 'thinking' },
+];
 
 const MAX_TURNS = 4; // Jeff wraps up after this many user replies, to keep demos short
 const sessions = new Map<string, Session>();
@@ -187,12 +350,16 @@ function riskOf(s: Session): Risk {
   return { score, level: levelOf(score), signals: s.signals };
 }
 
-function recommend(level: Risk['level']): Choice {
-  return level === 'low' ? 'continue' : 'protected';
+function recommend(level: Risk['level'], high: Choice = 'protected'): Choice {
+  return level === 'low' ? 'continue' : high;
 }
 
 function inferScenario(p: Payment): ScenarioId {
+  const t = `${p.recipient_name} ${p.note}`;
+  if (/prize/i.test(t)) return 'worried';
+  if (/invest|trading|crypto/i.test(t)) return 'influenced';
   if (!p.recipient_is_new) return 'legit';
+  if (/emergency|bail|hospital/i.test(t)) return 'coached';
   if (/donat|charit|relief|fund|foundation/i.test(p.recipient_name + ' ' + p.note)) return 'charity';
   return 'romance';
 }
@@ -200,10 +367,29 @@ function inferScenario(p: Payment): ScenarioId {
 function turn(s: Session, message: string, mood: Mood, quick?: string[], done = false): AgentTurn {
   const risk = riskOf(s);
   const suggest = done || risk.level === 'high' || (risk.level === 'low' && mood === 'relieved');
-  return { message, mood, risk, quick_replies: quick, recommended: suggest ? recommend(risk.level) : null, done };
+  return { message, mood, risk, quick_replies: quick, recommended: suggest ? recommend(risk.level, SCENARIOS[s.scenario].recommendHigh) : null, done };
+}
+
+// Decides how much attention a payment needs, before any chat. Amount, newness of the recipient and
+// scam-like wording all count. The real backend replaces this with its own risk engine.
+const SCAMMY = /prize|invest|trading|crypto|emergency|bail|hospital|gift ?card|urgent|donat|wire/i;
+export function precheckLocal(p: Payment): Precheck {
+  const scammy = SCAMMY.test(`${p.recipient_name} ${p.note}`);
+  const a = p.amount;
+  if (scammy && a >= 100) return { action: 'hold', reason: 'Scam-like wording on a notable amount' };
+  if (p.recipient_is_new && a >= 1000) return { action: 'hold', reason: 'Large first payment to a new recipient' };
+  if (!p.recipient_is_new && a >= 3000) return { action: 'hold', reason: 'Much larger than usual' };
+  if (!p.recipient_is_new && a < 250) return { action: 'allow', reason: 'Small payment to a known recipient' };
+  if (p.recipient_is_new && a < 100) return { action: 'allow', reason: 'Small amount' };
+  return { action: 'check', reason: 'Moderate amount' };
 }
 
 export const mockApi = {
+  async precheck(payment: Payment): Promise<Precheck> {
+    await sleep(250);
+    return precheckLocal(payment);
+  },
+
   async startSession(payment: Payment): Promise<StartResponse> {
     await sleep(thinkTime());
     const scenario = inferScenario(payment);
@@ -228,7 +414,7 @@ export const mockApi = {
     const sc = SCENARIOS[s.scenario];
     s.turns += 1;
 
-    const idx = sc.rules.findIndex((r, i) => !s.usedRules.has(i) && r.test.test(text));
+    const idx = sc.rules.findIndex((r, i) => !s.usedRules.has(i) && r.test.test(text) && (!r.when || r.when(s.payment)));
     if (idx >= 0 && s.turns < MAX_TURNS) {
       const r = sc.rules[idx];
       s.usedRules.add(idx);
@@ -236,15 +422,18 @@ export const mockApi = {
       if (r.signal && !s.signals.some((x) => x.code === r.signal!.code)) s.signals.push(r.signal);
       return turn(s, r.reply, r.mood, r.quick);
     }
-    if (s.followupIdx < sc.followups.length && s.turns < MAX_TURNS) {
-      const f = sc.followups[s.followupIdx++];
+    if (s.turns < MAX_TURNS) {
+      const f: { reply: string; mood: Mood; quick?: string[] } = s.followupIdx < sc.followups.length
+        ? sc.followups[s.followupIdx]
+        : FALLBACKS[(s.followupIdx - sc.followups.length) % FALLBACKS.length];
+      s.followupIdx += 1;
       return turn(s, f.reply, f.mood, f.quick);
     }
     const high = levelOf(s.score) !== 'low';
     return turn(s, high ? sc.closing.high : sc.closing.low, high ? 'concerned' : 'relieved', undefined, true);
   },
 
-  async decide(sessionId: string, choice: Choice, order_id?: string): Promise<DecisionResult> {
+  async decide(sessionId: string, choice: Choice): Promise<DecisionResult> {
     await sleep(500);
     if (!sessions.has(sessionId)) throw new Error('This session has expired. Please start again.');
     if (choice === 'cancel')
@@ -252,13 +441,9 @@ export const mockApi = {
     if (choice === 'protected')
       return {
         status: 'protected',
-        message: 'The money is released when you confirm delivery.',
-        order_id: order_id || 'DEMO-ORDER-1042',
+        message: 'The money is released when you confirm.',
+        order_id: 'ORD-1042',
       };
-    return {
-      status: 'sent',
-      message: order_id ? 'Payment authorized successfully via PayPal.' : 'Payment completed successfully.',
-      order_id,
-    };
+    return { status: 'sent', message: 'No real money moved. ' };
   },
 };

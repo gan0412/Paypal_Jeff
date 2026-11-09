@@ -1,150 +1,50 @@
-# 🛡️ Jeff — Paypal's Financial Bodyguard
+# Jeff: a calm second look before you send money
 
- *"When the scammers attack, Jeff has your back."*
+PayPal AI Hackathon 2026 project. Many scams are *authorized push payments*: the victim is persuaded
+(romance, fake charity, fake friend) and clicks past every warning. Banners get ignored when someone is
+being coached. Jeff is an **AI assistant** that holds a risky payment and has a short, gentle conversation
+with the sender before it goes out. The sender always makes the final decision.
 
+## Principles
+1. Jeff is **always labeled as an AI**. It never pretends to be human.
+2. Jeff **advises only**. It cannot block or approve a payment.
+3. Calm tone and mild expressions. No alarm.
+4. No third party is told about the payment (privacy).
 
+## Repo layout
+- `frontend/`: React + Vite + TypeScript UI. Runs with a built-in mock Jeff, so no backend is needed.
+- `docs/API_CONTRACT.md`: the three API calls between frontend and backend. **Backend: build to this.**
+- `backend/`: (teammates) agent + risk engine + PayPal sandbox calls.
 
-## 💡 Product Overview
-
-### The Problem
-In modern **Authorized Push Payment (APP)**, one of the biggest threats is psychological manipulation and social engineering. Scammers emotionally manipulate victims through manufactured urgency, fake family emergencies, romance pretexts, and fake charities into authorizing transactions themselves.
-
-Victims in high-stress emotional states experience **cognitive tunnel vision**: they view static caution banners and generic warning popups as annoying friction and reflexively click past them.
-
-### The Solution
-**Jeff** is an empathetic, humanlike AI bodyguard built directly into the PayPal checkout experience. Instead of acting as an inflexible blocking mechanism, Jeff acts as a calm, trusted second look:
-
-1. **Real-Time Contextual Scanning:** Analyzes recipient history, transfer amount, payment memo, and transaction type (Friends & Family vs. Goods & Services) in real-time.
-2. **Non-Intrusive Visual Alerting:** When high scam risk is detected, Jeff's corner avatar immediately flashes a prominent red sign (warning triangle + pulsing halo) to alert the user. Jeff never forcibly hijacks the screen or locks the user out.
-3. **Conversational De-escalation:** Powered by **Claude 5.5 Haiku**, Jeff validates emotional stress, gently unpacks common scammer tactics (urgency, secrecy, lack of live video), and helps the user pause and think critically.
-4. **Strict Respect for User Agency:** Jeff **advises only and never blocks payments**. If a user confirms familiarity (e.g., *"It's my dad"*, *"I verified them"*), Jeff immediately shifts to calm/neutral without arguing or lecturing. The user always holds the final decision.
-5. **Meaningful PayPal Developer Integration:** Uses the official PayPal JavaScript SDK (`@paypal/react-paypal-js`) to render PayPal Smart Payment Buttons. When Jeff guides a user to safety, they can seamlessly switch from unprotected Friends & Family to protected Goods & Services with full PayPal buyer protection.
-
----
-
-## 🎯 Core Principles
-
-1. **Always Transparently Labeled as AI:** Jeff never impersonates a human, it only acts like a humanlike AI agent.
-2. **Advises, Never Blocks:** Jeff provides intelligence and guidance; the sender always retains full authority over their money.
-3. **Calm & Non-Judgmental:** Tone is supportive and conversational—no panic, accusatory interrogation, or alarmist friction.
-4. **Zero Policy Leakage & PII Protection:** Automated guardrails scrub credit cards, SSNs, and OTPs, and never disclose internal fraud scoring logic to prevent scammers from reverse-engineering defenses.
-
----
-
-## 🛠️ Architecture
-
+## Run the frontend
+```bash
+cd frontend
+npm install
+npm run dev        # http://localhost:5173, uses the mock by default
 ```
-┌─────────────────────────────────────────────────────────────┐
-│             React + TypeScript Frontend (Vite)              │
-│  - Send Money Form & Interactive Demo Scenarios             │
-│  - Corner Animated Avatar (Neutral / Thinking / Concerned)   │
-│  - Non-blocking PayPal Smart Buttons (@paypal/react-paypal-js)│
-│  - Collapsible De-escalation Chat Widget                    │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ (Proxied /api REST calls)
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    FastAPI Backend Service                  │
-│  - Session State Manager (docs/API_CONTRACT.md)             │
-│  - Security Guardrails (PII Scrubber + Policy Shield)       │
-│  - Claude 3.5 Haiku Conversational Reasoner                 │
-└─────────────────────────────────────────────────────────────┘
-```
+To use the real backend, set `VITE_USE_MOCK=false` in `frontend/.env.development` and run the backend on port 8000
+(the dev server proxies `/api` to it).
 
----
+## Demo scenarios (one click each)
+Six one-click scenarios on the Send money screen:
+- **Romance scam** and **Fake charity**: classic authorized push payments.
+- **Coached**: the sender's story doesn't match the account, or someone told them what to say.
+- **Won't listen**: the sender is sure an investment is safe and gets defensive. Jeff steps back, stays kind, asks for a 24 hour pause.
+- **Worried for Ray**: the sender is trying to protect a relative who is being scammed. Jeff suggests cancelling.
+- **Normal payment**: rent to a known person, so Jeff isn't just scaring everyone.
 
-## 🚀 Teammate Quickstart Guide
+Jeff never accuses anyone and never claims to detect lies. Answers are compared with facts visible on the account.
 
-To run the complete application locally, start both the **Backend** and the **Frontend** in two separate terminal windows.
+## When does Jeff appear?
+Before any chat, `POST /api/precheck` rates the payment. Small ordinary payments (for example $40 to a known person)
+go straight through and Jeff stays out of the way. Moderate ones hold the payment and Jeff opens quietly. Large first
+payments or scam-like wording hold it and dim the screen. Try changing the amount on any scenario to see the tiers.
 
----
+## Notes for the backend
+- Free-text replies already go to `POST /api/session/{id}/message`. The mock only matches keywords and falls back to
+  gentle open questions; a real model should handle any answer using the same response shape.
+- The "worried about someone else" case currently runs inside a payment. A chat not tied to a payment would need a new
+  endpoint, so let the frontend know before building it.
 
-### Step 1: Start the Backend (Terminal 1)
-
-1. **Navigate to the backend directory and activate the virtual environment:**
-   ```bash
-   cd backend
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   ```
-
-2. **Configure environment variables:**
-   Verify `backend/.env` exists (or copy from `.env.example`). Ensure your Anthropic API key is set:
-   ```env
-   ANTHROPIC_API_KEY=sk-ant-api03-...
-   ANTHROPIC_MODEL=claude-haiku-5-5
-   HOST=0.0.0.0
-   PORT=8000
-   ```
-
-3. **Launch the server:**
-   ```bash
-   python run.py
-   ```
-   *(Or run directly: `PYTHONPATH=. uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload`)*
-
-   The backend will start at: **`http://127.0.0.1:8000`**  
-   Interactive API docs (Swagger): **`http://127.0.0.1:8000/docs`**
-
----
-
-### Step 2: Start the Frontend (Terminal 2)
-
-1. **Navigate to the frontend directory:**
-   ```bash
-   cd frontend
-   ```
-
-2. **Select Node >= 20.12 (Node 23 / 24 recommended for Vite 8):**
-   ```bash
-   nvm use
-   ```
-   *(If not using NVM, use Homebrew Node 24: `PATH="/opt/homebrew/bin:$PATH"`)*
-
-3. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-4. **Verify backend connection setting:**
-   In [`frontend/.env.development`](frontend/.env.development):
-   ```ini
-   VITE_USE_MOCK=false
-   ```
-   *(Vite automatically proxies `/api` calls to `http://localhost:8000`)*
-
-5. **Start the development server:**
-   ```bash
-   npm run dev
-   ```
-
-6. **Open in browser:**  
-   Navigate to **`http://localhost:5173`**
-
----
-
-## 🧪 Demo Scenarios (One-Click Testing)
-
-At the top of the Send Money screen, you can click presets to instantly test Jeff's behavior:
-
-| Preset Scenario | Details | Risk Level | Expected Jeff Behavior |
-| :--- | :--- | :---: | :--- |
-| **Romance Scam** | $2,400 to new recipient "Daniel Reyes" with note *"for your flight, love you"* (Friends & Family) | **HIGH** | Avatar flashes red alert sign; Jeff gently unpacks travel scam patterns and asks if you've met on live video. |
-| **Fake Charity** | $120 to "Global Relief Foundation" with note *"urgent medical donation"* | **HIGH** | Avatar flashes red alert sign; Jeff encourages verifying charity registry credentials before sending. |
-| **Routine Rent** | $850 to known roommate "Priya Sharma" with note *"November rent"* | **LOW** | Avatar stays calm/neutral; Jeff recognizes recurring history and lets transaction flow smoothly. |
-
----
-
-## 🚦 Testing & Verification
-
-- **Backend Test Suite (20 tests verifying guardrails, sessions, and agency):**
-  ```bash
-  PYTHONPATH=backend backend/.venv/bin/pytest backend/tests/ -v
-  ```
-
-- **Frontend TypeScript Build & Packaging:**
-  ```bash
-  cd frontend
-  npm run build
-  ```
+## Honest notes
+Sample people and amounts only. Mock replies are scripted. No claim is made about reducing real fraud.
