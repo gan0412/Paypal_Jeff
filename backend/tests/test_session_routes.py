@@ -192,3 +192,50 @@ def test_session_decision_flow():
     cont_res = client.post(f"/api/session/{session_id}/decision", json={"choice": "continue"})
     assert cont_res.status_code == 200
     assert cont_res.json()["status"] == "sent"
+
+
+def _mock_client_capturing(captured: dict, message: str = "Hola, soy Jeff, un asistente de IA."):
+    block = MagicMock()
+    block.type = "tool_use"
+    block.name = "respond_session_turn"
+    block.input = {"message": message, "mood": "listening", "score": 48, "quick_replies": ["Sí", "No"], "done": False}
+    resp = MagicMock()
+    resp.content = [block]
+
+    async def create(**kwargs):
+        captured.setdefault("systems", []).append(kwargs["system"])
+        return resp
+
+    mock_client = MagicMock()
+    mock_client.messages.create = create
+    return mock_client
+
+
+_PAYMENT = {
+    "amount": 120.0, "currency": "USD", "recipient_name": "Global Relief", "recipient_email": "help@example.org",
+    "recipient_is_new": True, "note": "urgent donation", "payment_type": "friends_family",
+}
+
+
+def test_session_language_instruction_reaches_prompt():
+    captured: dict = {}
+    with patch("app.jeff_core.get_anthropic_client", return_value=_mock_client_capturing(captured)):
+        r = client.post("/api/session/start", json={"payment": _PAYMENT, "language": "es"})
+        assert r.status_code == 200
+        assert "Spanish" in captured["systems"][0]
+
+        # Language persists to follow-up turns, and can be switched mid-session.
+        sid = r.json()["session_id"]
+        client.post(f"/api/session/{sid}/message", json={"text": "Es mi amigo"})
+        assert "Spanish" in captured["systems"][1]
+        client.post(f"/api/session/{sid}/message", json={"text": "C'est mon ami", "language": "fr"})
+        assert "French" in captured["systems"][2]
+
+
+def test_session_language_defaults_to_english():
+    captured: dict = {}
+    with patch("app.jeff_core.get_anthropic_client", return_value=_mock_client_capturing(captured)):
+        for lang in (None, "xx"):
+            body = {"payment": _PAYMENT} if lang is None else {"payment": _PAYMENT, "language": lang}
+            assert client.post("/api/session/start", json=body).status_code == 200
+    assert all("[Language]" not in s for s in captured["systems"])

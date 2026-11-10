@@ -39,6 +39,8 @@ try:
         JEFF_TOOL_DEFINITION,
         SESSION_SYSTEM_PROMPT,
         SESSION_TOOL_DEFINITION,
+        language_instruction,
+        normalize_language,
     )
 except (ImportError, ModuleNotFoundError):
     try:
@@ -65,6 +67,8 @@ except (ImportError, ModuleNotFoundError):
             JEFF_TOOL_DEFINITION,
             SESSION_SYSTEM_PROMPT,
             SESSION_TOOL_DEFINITION,
+            language_instruction,
+            normalize_language,
         )
     except (ImportError, ValueError):
         import config as _config_mod
@@ -91,6 +95,8 @@ except (ImportError, ModuleNotFoundError):
             JEFF_TOOL_DEFINITION,
             SESSION_SYSTEM_PROMPT,
             SESSION_TOOL_DEFINITION,
+            language_instruction,
+            normalize_language,
         )
 
 logger = logging.getLogger("jeff_backend")
@@ -299,6 +305,7 @@ class SessionState:
         self.mood: MoodType = "thinking"
         self.turns: int = 0
         self.created_at: float = time.time()
+        self.language: str = "en"
 
 
 sessions_store: Dict[str, SessionState] = {}
@@ -369,11 +376,12 @@ def build_initial_signals(payment: PaymentPayload) -> List[RiskSignalPayload]:
     return signals
 
 
-async def generate_session_start(payment: PaymentPayload) -> StartSessionResponse:
+async def generate_session_start(payment: PaymentPayload, language: str = "en") -> StartSessionResponse:
     """Initiate a payment review session, evaluate risk, and generate Jeff's opening turn."""
     session_id = f"sess_{uuid.uuid4().hex[:10]}"
     session = SessionState(session_id=session_id, payment=payment)
     session.signals = build_initial_signals(payment)
+    session.language = normalize_language(language)
 
     # Initial baseline heuristic
     if not payment.recipient_is_new:
@@ -398,7 +406,7 @@ async def generate_session_start(payment: PaymentPayload) -> StartSessionRespons
         f"- Initial Detected Signals: {', '.join(s.code for s in session.signals)}\n"
         f"- Suggested Initial Base Score: {base_score}\n"
     )
-    system_text += tx_summary
+    system_text += tx_summary + language_instruction(session.language)
 
     client = get_anthropic_client()
     user_prompt = (
@@ -532,7 +540,7 @@ async def generate_session_start(payment: PaymentPayload) -> StartSessionRespons
         )
 
 
-async def generate_session_message(session_id: str, text: str) -> AgentTurnPayload:
+async def generate_session_message(session_id: str, text: str, language: Optional[str] = None) -> AgentTurnPayload:
     """Process an ongoing conversation turn inside an active session."""
     session = sessions_store.get(session_id)
     if not session:
@@ -540,6 +548,8 @@ async def generate_session_message(session_id: str, text: str) -> AgentTurnPaylo
             status_code=404,
             detail="This session has expired. Please start again.",
         )
+    if language:
+        session.language = normalize_language(language)
 
     # 1. Policy probe safeguard
     is_probe, probe_reply = check_policy_probe(text)
@@ -577,7 +587,7 @@ async def generate_session_message(session_id: str, text: str) -> AgentTurnPaylo
         f"- Current Risk Score: {session.score} ({session.level})\n"
         f"- Current Active Signals: {', '.join(s.code for s in session.signals)}\n"
     )
-    system_text += tx_summary
+    system_text += tx_summary + language_instruction(session.language)
 
     api_messages = [{"role": msg["role"], "content": msg["content"]} for msg in session.messages]
     client = get_anthropic_client()

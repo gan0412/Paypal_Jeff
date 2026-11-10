@@ -187,7 +187,7 @@ async def evaluate_transaction(request: EvaluateRequest):
 )
 async def start_session(request: StartSessionRequest):
     """Initiates a payment review session. Analyzes payment risk and returns Jeff's opening turn."""
-    return await generate_session_start(request.payment)
+    return await generate_session_start(request.payment, request.language)
 
 
 @app.post(
@@ -197,7 +197,7 @@ async def start_session(request: StartSessionRequest):
 )
 async def send_session_message(session_id: str, request: SendMessageRequest):
     """Processes user response in the review dialog with Claude Haiku."""
-    return await generate_session_message(session_id=session_id, text=request.text)
+    return await generate_session_message(session_id=session_id, text=request.text, language=request.language)
 
 
 @app.post(

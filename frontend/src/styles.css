@@ -103,7 +103,7 @@ button.wide { width: 100%; padding: 16px; font-size: 18px; }
 .w-head { display: flex; align-items: center; gap: 12px; }
 .w-title { flex: 1; min-width: 0; }
 .w-title h2 { margin: 0 0 4px; font-size: 22px; }
-.ai-badge { font: 600 11px/1 -apple-system, "Segoe UI", sans-serif; padding: 4px 8px; border-radius: 6px; background: var(--blue-dark); color: #fff; letter-spacing: .03em; }
+.ai-badge { white-space: nowrap; font: 600 11px/1 -apple-system, "Segoe UI", sans-serif; padding: 4px 8px; border-radius: 6px; background: var(--blue-dark); color: #fff; letter-spacing: .03em; }
 .voice { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .voice[aria-pressed=true] { background: var(--soft); border-color: var(--blue); color: var(--blue-dark); font-weight: 600; }
 .x { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--soft2); color: var(--ink); display: grid; place-items: center; cursor: pointer; }
@@ -119,6 +119,56 @@ button.wide { width: 100%; padding: 16px; font-size: 18px; }
 }
 @keyframes breathe { 50% { transform: scale(1.03); } }
 @keyframes nod { 50% { translate: 0 1.2px; } }
+
+/* ---------- Jeff's red-alert face ---------- */
+/* Startle: a quick head jolt as Jeff spots the risk. */
+.avatar .alert-glow { opacity: 0; transition: opacity .3s; }
+.avatar .sweat { opacity: 0; }
+.avatar.startle .head { animation: jolt .9s cubic-bezier(.3,1.6,.5,1); }
+.avatar.startle .alert-glow { opacity: .55; }
+@keyframes jolt {
+  0% { translate: 0 0; rotate: 0deg; }
+  14% { translate: 0 -9px; rotate: -4deg; scale: 1.05; }
+  30% { translate: 3px -4px; rotate: 3deg; scale: 1.02; }
+  46% { translate: -3px -1px; rotate: -2deg; }
+  62% { translate: 2px 0; rotate: 1deg; }
+  100% { translate: 0 0; rotate: 0deg; scale: 1; }
+}
+/* Held alert: red pulse behind Jeff, darting eyes, furrowing brows, a sliding sweat drop. */
+.avatar.alerting .alert-glow { animation: alertGlow 1.3s ease-in-out infinite; }
+.avatar.alerting .eyes { animation: dart 3.2s ease-in-out infinite; }
+.avatar.alerting .brows { animation: furrow 1.3s ease-in-out infinite; }
+.avatar.alerting .sweat { animation: sweat 2.6s ease-in infinite; }
+.avatar.alerting .head { animation: shiver 2.6s ease-in-out infinite; }
+@keyframes alertGlow { 0%, 100% { opacity: .12; } 50% { opacity: .5; } }
+@keyframes dart { 0%, 30%, 100% { translate: 0 0; } 38%, 50% { translate: -3px 0; } 58%, 70% { translate: 3px 0; } 78% { translate: 0 0; } }
+@keyframes furrow { 0%, 100% { translate: 0 0; } 50% { translate: 0 1.5px; } }
+@keyframes sweat { 0% { opacity: 0; translate: 0 -4px; } 20% { opacity: 1; translate: 0 0; } 75% { opacity: 1; translate: 0 10px; } 100% { opacity: 0; translate: 0 16px; } }
+@keyframes shiver { 0%, 86%, 100% { translate: 0 0; } 89% { translate: -1px 0; } 92% { translate: 1px 0; } 95% { translate: -1px 0; } }
+
+/* ---------- language picker (top bar) ---------- */
+.lang-pick { display: flex; align-items: center; gap: 6px; color: var(--mute); font-size: 13px; }
+.lang-pick select, .settings select { font: inherit; font-size: 14px; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+
+/* ---------- Jeff settings panel ---------- */
+.gear { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--ink); display: grid; place-items: center; cursor: pointer; }
+.gear:hover, .gear[aria-pressed=true] { background: var(--soft); border-color: var(--blue); color: var(--blue-dark); }
+.settings { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding: 2px; }
+.settings h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--mute); }
+.settings-preview { display: flex; justify-content: center; padding: 6px 0 2px; }
+.setting { display: grid; gap: 6px; margin-bottom: 10px; }
+.setting > span { font-size: 13px; color: var(--mute); }
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg button { border: 1.5px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 6px 14px; font-size: 14px; cursor: pointer; }
+.seg button[aria-pressed=true] { border-color: var(--blue); background: var(--soft); color: var(--blue-dark); font-weight: 600; }
+.swatches { display: flex; gap: 10px; flex-wrap: wrap; }
+.swatch { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--card); box-shadow: 0 0 0 1.5px var(--line); cursor: pointer; padding: 0; }
+.swatch[aria-pressed=true] { box-shadow: 0 0 0 3px var(--blue); }
+.setting input[type=range] { width: 100%; accent-color: var(--blue); }
+.toggle { display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--blue); }
+.settings-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.settings .note { font-size: 12.5px; color: var(--mute); margin: 0; }
 
 /* ---------- Glaring Red Alert Sign (when Jeff is concerned) ---------- */
 .w-avatar-container { position: relative; display: inline-block; flex: none; }
@@ -157,6 +207,7 @@ button.wide { width: 100%; padding: 16px; font-size: 18px; }
 .w-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
 .w-name-row h2 { margin: 0; }
 .glaring-alert-tag {
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -215,6 +266,7 @@ button.ghost:disabled { opacity: .5; cursor: default; }
   .screen { padding: 22px 16px; }
   .amount-field input { font-size: 46px; }
   .launcher-label { display: none; }
+  .lang-pick > span { display: none; }
   .widget { inset: 0; right: 0; bottom: 0; width: auto; max-width: none; height: 100dvh; border-radius: 0; border: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
