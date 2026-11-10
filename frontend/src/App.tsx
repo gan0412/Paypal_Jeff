@@ -2,6 +2,8 @@ import { useRef, useState } from 'react';
 import { PayPalScriptProvider } from '@paypal/react-paypal-js';
 import { api } from './api';
 import { ChatWidget } from './components/ChatWidget';
+import { Hero } from './components/Hero';
+import { ResultCard } from './components/ResultCard';
 import { ReviewStep } from './components/ReviewStep';
 import { SendStep } from './components/SendStep';
 import { evaluatePaymentInstant } from './riskEvaluator';
@@ -149,6 +151,7 @@ export default function App() {
 
   return (
     <PayPalScriptProvider options={paypalOptions}>
+      <div className="bg" aria-hidden="true"><i /><i /><i /></div>
       <nav className="nav" aria-label="Main">
         <div className="nav-in">
           <div className="brand"><span className="mark" aria-hidden="true"><i /><i /></span><span>SamplePay</span></div>
@@ -165,32 +168,26 @@ export default function App() {
         </div>
       </nav>
 
-      <main className="app">
-        {step === 'send' && <SendStep payment={payment} onChange={handlePaymentChange} onNext={handleNext} />}
+      <main className={`app ${step === 'result' ? 'solo' : ''}`}>
+        {step !== 'result' && <Hero held={isConcerned || held} />}
+        <div className="stage">
+          {step === 'send' && <SendStep payment={payment} onChange={handlePaymentChange} onNext={handleNext} />}
 
-        {step === 'review' && (
-          <ReviewStep
-            payment={payment}
-            isConcerned={isConcerned}
-            chatOpen={chatOpen}
-            onBack={() => setStep('send')}
-            onSend={sendPayment}
-            onOpenChat={openChat}
-            onPayPalSuccess={handlePayPalSuccess}
-          />
-        )}
+          {step === 'review' && (
+            <ReviewStep
+              payment={payment}
+              isConcerned={isConcerned}
+              chatOpen={chatOpen}
+              onBack={() => setStep('send')}
+              onSend={sendPayment}
+              onOpenChat={openChat}
+              onPayPalSuccess={handlePayPalSuccess}
+            />
+          )}
 
-        {step === 'result' && result && (
-          <div className="flow">
-            <div className={`screen result ${result.status}`} role="status">
-              <h1 className="title">{t(`result_${result.status}`)}</h1>
-              <p>{lang === 'en' ? result.message : t(`resultMsg_${result.status}`)}</p>
-              {result.order_id && <p className="mute">{t('paypalRef')}: {result.order_id}</p>}
-              {result.approve_url && <p><a href={result.approve_url} target="_blank" rel="noopener noreferrer">{t('openProtected')}</a></p>}
-              <button type="button" className="primary wide" onClick={reset}>{t('tryAnother')}</button>
-            </div>
-          </div>
-        )}
+          {step === 'result' && result && <ResultCard result={result} onAgain={reset} />}
+        </div>
+        <p className="foot">Built for the PayPal AI Hackathon. Prototype, not an official PayPal product.</p>
       </main>
 
       {step !== 'result' && (
