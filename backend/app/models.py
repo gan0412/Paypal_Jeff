@@ -139,6 +139,7 @@ class StartSessionRequest(BaseModel):
     """Request payload to initiate a payment review session."""
 
     payment: PaymentPayload = Field(..., description="Payment being reviewed")
+    language: str = Field(default="en", max_length=10, description="Language code Jeff should reply in (e.g. en, es, fr)")
 
 
 class StartSessionResponse(AgentTurnPayload):
@@ -151,6 +152,7 @@ class SendMessageRequest(BaseModel):
     """Request payload for sending a user message in an active session."""
 
     text: str = Field(..., description="User message text")
+    language: Optional[str] = Field(default=None, max_length=10, description="Switch Jeff's reply language for this and later turns")
 
 
 class DecisionRequest(BaseModel):

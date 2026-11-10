@@ -1,4 +1,5 @@
 import { mockApi } from './mock';
+import type { LangCode } from './i18n';
 import type { AgentTurn, Choice, DecisionResult, Payment, StartResponse } from './types';
 
 // VITE_USE_MOCK=true (default in dev) -> built-in mock. Set to "false" to call the real backend.
@@ -33,8 +34,8 @@ async function call<T>(path: string, body: unknown): Promise<T> {
 }
 
 const realApi = {
-  startSession: (payment: Payment) => call<StartResponse>('/session/start', { payment }),
-  sendMessage: (id: string, text: string) => call<AgentTurn>(`/session/${id}/message`, { text }),
+  startSession: (payment: Payment, language: LangCode = 'en') => call<StartResponse>('/session/start', { payment, language }),
+  sendMessage: (id: string, text: string, language?: LangCode) => call<AgentTurn>(`/session/${id}/message`, { text, language }),
   decide: (id: string, choice: Choice, order_id?: string) =>
     call<DecisionResult>(`/session/${id}/decision`, { choice, order_id }),
 };

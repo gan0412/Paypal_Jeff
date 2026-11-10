@@ -6,6 +6,9 @@ import { ReviewStep } from './components/ReviewStep';
 import { SendStep } from './components/SendStep';
 import { evaluatePaymentInstant } from './riskEvaluator';
 import { PRESETS } from './scenarios';
+import { LANGS } from './i18n';
+import type { LangCode } from './i18n';
+import { usePrefs } from './prefs';
 import type { AgentTurn, ChatMessage, Choice, DecisionResult, Payment } from './types';
 
 type Step = 'send' | 'review' | 'result';
@@ -20,6 +23,7 @@ const paypalOptions = {
 };
 
 export default function App() {
+  const { t, lang, setLang } = usePrefs();
   const [payment, setPayment] = useState<Payment>({ ...PRESETS[0].payment });
   const [step, setStep] = useState<Step>('send');
   const [chatOpen, setChatOpen] = useState(false);
@@ -32,6 +36,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const nextId = useRef(1);
   const sessionKey = useRef('');   // which payment the current chat session is about
+  const sessionLang = useRef(lang); // which language it started in
   const starting = useRef(false);
 
   const add = (from: ChatMessage['from'], text: string) =>
@@ -44,9 +49,10 @@ export default function App() {
     starting.current = true;
     setBusy(true); setError(null);
     sessionKey.current = JSON.stringify(p);
+    sessionLang.current = lang;
     setMessages([]); setTurn(null); setSessionId(null);
     try {
-      const r = await api.startSession(p);
+      const r = await api.startSession(p, lang);
       setSessionId(r.session_id);
       setMessages([{ id: nextId.current++, from: 'jeff', text: r.message }]);
       setTurn(r);
@@ -61,23 +67,29 @@ export default function App() {
     }
   }
 
+  // A session is about one payment in one language. Switching language only restarts the session
+  // while the user hasn't replied yet; after that, Jeff simply answers in the new language.
+  const userReplied = messages.some((m) => m.from === 'user');
+  const needsNewSession = (p: Payment) =>
+    sessionKey.current !== JSON.stringify(p) || (sessionLang.current !== lang && !userReplied);
+
   // Opening the chat starts a fresh session if there is none yet, or if the payment changed since.
   function openChat() {
     setChatOpen(true);
-    if (sessionKey.current !== JSON.stringify(payment)) void startSession();
+    if (needsNewSession(payment)) void startSession();
   }
 
   function handleNext() {
     setStep('review');
     // Evaluate payment in the background without automatically opening the chatbox
-    if (sessionKey.current !== JSON.stringify(payment)) {
+    if (needsNewSession(payment)) {
       void startSession(payment);
     }
   }
 
   function handlePaymentChange(p: Payment) {
     setPayment(p);
-    if (sessionKey.current !== JSON.stringify(p)) {
+    if (needsNewSession(p)) {
       setTurn(null);
       setSessionId(null);
       setHeld(false);
@@ -112,7 +124,7 @@ export default function App() {
     add('user', text);
     setBusy(true); setError(null);
     try {
-      const r = await api.sendMessage(sessionId, text);
+      const r = await api.sendMessage(sessionId, text, lang);
       add('jeff', r.message);
       setTurn(r);
     } catch (e) { fail(e); } finally { setBusy(false); }
@@ -141,6 +153,13 @@ export default function App() {
         <div className="nav-in">
           <div className="brand"><span className="mark" aria-hidden="true"><i /><i /></span><span>SamplePay</span></div>
           <div className="nav-right">
+            <label className="lang-pick">
+              <span aria-hidden="true">🌐</span>
+              <span className="sr">{t('language')}</span>
+              <select value={lang} onChange={(e) => setLang(e.target.value as LangCode)} aria-label={t('language')}>
+                {LANGS.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
+              </select>
+            </label>
             <span className="me" aria-label="Signed in as Maya R. (sample)">MR</span>
           </div>
         </div>
@@ -164,11 +183,11 @@ export default function App() {
         {step === 'result' && result && (
           <div className="flow">
             <div className={`screen result ${result.status}`} role="status">
-              <h1 className="title">{result.status === 'sent' ? 'Payment sent' : result.status === 'protected' ? 'Protected payment set up' : 'Payment cancelled'}</h1>
-              <p>{result.message}</p>
-              {result.order_id && <p className="mute">PayPal Reference: {result.order_id}</p>}
-              {result.approve_url && <p><a href={result.approve_url} target="_blank" rel="noopener noreferrer">Open protected checkout</a></p>}
-              <button type="button" className="primary wide" onClick={reset}>Try another scenario</button>
+              <h1 className="title">{t(`result_${result.status}`)}</h1>
+              <p>{lang === 'en' ? result.message : t(`resultMsg_${result.status}`)}</p>
+              {result.order_id && <p className="mute">{t('paypalRef')}: {result.order_id}</p>}
+              {result.approve_url && <p><a href={result.approve_url} target="_blank" rel="noopener noreferrer">{t('openProtected')}</a></p>}
+              <button type="button" className="primary wide" onClick={reset}>{t('tryAnother')}</button>
             </div>
           </div>
         )}

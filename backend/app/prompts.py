@@ -191,3 +191,37 @@ SESSION_TOOL_DEFINITION = {
     },
 }
 
+
+
+# Languages Jeff can reply in. Keys match the frontend language codes.
+SUPPORTED_LANGUAGES = {
+    "en": "English",
+    "es": "Spanish",
+    "fr": "French",
+    "pt": "Portuguese",
+    "de": "German",
+    "zh": "Simplified Chinese",
+    "hi": "Hindi",
+    "ar": "Arabic",
+}
+
+
+def normalize_language(code: str | None) -> str:
+    """Return a supported language code, falling back to English."""
+    code = (code or "en").strip().lower().split("-")[0]
+    return code if code in SUPPORTED_LANGUAGES else "en"
+
+
+def language_instruction(code: str) -> str:
+    """System prompt addendum telling Jeff which language to reply in."""
+    code = normalize_language(code)
+    if code == "en":
+        return ""
+    name = SUPPORTED_LANGUAGES[code]
+    return (
+        f"\n\n[Language]\n"
+        f"The user's preferred language is {name}. Write `message` and every `quick_replies` entry in {name}, "
+        f"in plain, everyday wording. If the user writes in a different language, reply in the language they used. "
+        f"Still introduce yourself as an AI assistant named Jeff in {name}. "
+        f"When done is false, always include 2-3 quick_replies in {name}."
+    )

@@ -1,5 +1,6 @@
 import { PayPalButtons } from '@paypal/react-paypal-js';
 import type { Payment } from '../types';
+import { usePrefs } from '../prefs';
 
 interface Props {
   payment: Payment;
@@ -11,8 +12,8 @@ interface Props {
   onPayPalSuccess: (orderId: string) => void;
 }
 
-const money = (n: number, c: string) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: c }).format(n);
+const money = (n: number, c: string, lang: string) =>
+  new Intl.NumberFormat(lang, { style: 'currency', currency: c, currencyDisplay: 'narrowSymbol' }).format(n);
 
 export function ReviewStep({
   payment,
@@ -23,15 +24,15 @@ export function ReviewStep({
   onOpenChat,
   onPayPalSuccess,
 }: Props) {
+  const { t, lang } = usePrefs();
   const ff = payment.payment_type === 'friends_family';
 
   return (
     <div className="flow">
       <div className="screen">
-        <h1 className="title">Review and send</h1>
+        <h1 className="title">{t('reviewTitle')}</h1>
         <p className="amount-big">
-          <span className="cur">$</span>
-          {money(payment.amount, payment.currency).replace('$', '')}
+          {money(payment.amount, payment.currency, lang)}
           <span className="cur-code">{payment.currency}</span>
         </p>
 
@@ -51,7 +52,7 @@ export function ReviewStep({
             }}
           >
             <span style={{ fontSize: 13, fontWeight: 600, color: '#c0392b', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span>⚠️</span> Jeff noticed potential scam signals with this transfer.
+              <span>⚠️</span> {t('jeffNoticed')}
             </span>
             {!chatOpen && (
               <button
@@ -60,7 +61,7 @@ export function ReviewStep({
                 onClick={onOpenChat}
                 style={{ fontSize: 13, whiteSpace: 'nowrap' }}
               >
-                Review with Jeff
+                {t('reviewWithJeff')}
               </button>
             )}
           </div>
@@ -68,22 +69,22 @@ export function ReviewStep({
 
         <dl className="rows">
           <div className="row">
-            <dt>Sending to</dt>
+            <dt>{t('sendingTo')}</dt>
             <dd>{payment.recipient_name}</dd>
             <button type="button" className="linkbtn" onClick={onBack}>
-              Change
+              {t('change')}
             </button>
           </div>
           <div className="row">
-            <dt>Payment type</dt>
-            <dd>{ff ? 'Friends and family (no buyer protection)' : 'Goods and services (protected)'}</dd>
+            <dt>{t('paymentType')}</dt>
+            <dd>{ff ? t('ffNoProtection') : t('gsProtected')}</dd>
             <button type="button" className="linkbtn" onClick={onBack}>
-              Change
+              {t('change')}
             </button>
           </div>
           {payment.note && (
             <div className="row">
-              <dt>Note</dt>
+              <dt>{t('note')}</dt>
               <dd>{payment.note}</dd>
             </div>
           )}
@@ -142,7 +143,7 @@ export function ReviewStep({
           onClick={onSend}
           style={{ marginTop: 10, fontSize: 13 }}
         >
-          Or continue without PayPal checkout
+          {t('continueWithout')}
         </button>
       </div>
     </div>

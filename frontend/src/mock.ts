@@ -204,7 +204,7 @@ function turn(s: Session, message: string, mood: Mood, quick?: string[], done = 
 }
 
 export const mockApi = {
-  async startSession(payment: Payment): Promise<StartResponse> {
+  async startSession(payment: Payment, _language?: string): Promise<StartResponse> {
     await sleep(thinkTime());
     const scenario = inferScenario(payment);
     const sc = SCENARIOS[scenario];
@@ -221,7 +221,7 @@ export const mockApi = {
     return { session_id: id, ...turn(s, sc.opening, sc.openingMood, sc.openingQuick) };
   },
 
-  async sendMessage(sessionId: string, text: string): Promise<AgentTurn> {
+  async sendMessage(sessionId: string, text: string, _language?: string): Promise<AgentTurn> {
     await sleep(thinkTime());
     const s = sessions.get(sessionId);
     if (!s) throw new Error('This session has expired. Please start again.');
