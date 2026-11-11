@@ -239,3 +239,34 @@ def test_session_language_defaults_to_english():
             body = {"payment": _PAYMENT} if lang is None else {"payment": _PAYMENT, "language": lang}
             assert client.post("/api/session/start", json=body).status_code == 200
     assert all("[Language]" not in s for s in captured["systems"])
+
+
+def test_session_start_under_100_auto_passed():
+    # Any transaction lower than 100 should automatically pass with low risk and calm mood
+    payload = {
+        "payment": {
+            "amount": 75.0,
+            "currency": "USD",
+            "recipient_name": "Unknown Contact",
+            "recipient_email": "unknown@example.com",
+            "recipient_is_new": True,
+            "note": "urgent travel flight emergency bail",
+            "payment_type": "friends_family",
+        }
+    }
+    r = client.post("/api/session/start", json=payload)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["risk"]["score"] == 15
+    assert data["risk"]["level"] == "low"
+    assert data["mood"] == "calm"
+    assert data["recommended"] == "continue"
+    assert data["done"] is True
+    assert data["risk"]["signals"] == []
+    assert "$75.00" in data["message"]
+
+    # In Spanish
+    r_es = client.post("/api/session/start", json={**payload, "language": "es"})
+    assert r_es.status_code == 200
+    assert "continuar" in r_es.json()["message"]
+

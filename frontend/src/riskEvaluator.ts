@@ -12,6 +12,16 @@ export interface InstantRiskResult {
  * Ensures proactive alerts appear immediately without waiting for network LLM round-trips.
  */
 export function evaluatePaymentInstant(p: Payment): InstantRiskResult {
+  // Hardcoded threshold: for any transaction lower than 100, allow Jeff to pass it
+  if (p.amount < 100) {
+    return {
+      isConcerned: false,
+      score: 15,
+      level: 'low',
+      nudge: `Transfer of $${p.amount.toFixed(2)} is under the alert threshold. Looks good to proceed.`,
+    };
+  }
+
   if (!p.recipient_is_new) {
     return {
       isConcerned: false,

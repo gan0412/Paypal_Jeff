@@ -54,7 +54,7 @@ export interface ChatMessage {
 }
 
 export interface ScenarioPreset {
-  id: 'romance' | 'charity' | 'legit';
+  id: 'romance' | 'charity' | 'coached' | 'influenced' | 'worried' | 'legit';
   label: string;
   blurb: string;
   payment: Payment;
