@@ -55,6 +55,7 @@
   - Hardcoded < $100 auto-pass rule in backend and frontend risk evaluators (bypassing LLM calls for amounts under $100).
   - Fixed chat widget layering: elevated `.widget` to `z-index: 10000`, `.launcher` to `z-index: 9990`, and isolated `.paypal-btn-wrap` to `position: relative; z-index: 1` so the chatbox modal is always layered on top of PayPal button iframes.
   - Centered payment panel horizontally, removed hero text ("AI second look", "Send money with confidence", "Jeff pauses risky payments and talks them through with you") and security shield art, and aligned UI to authentic PayPal theme (solid PayPal `#003087` navbar with double-P logo, clean `#f5f7fa` background, white transaction card, PayPal blue pill action buttons, and crisp scenario preset cards).
+  - Removed redundant "Pay with protection" and "Send anyway" buttons from the chatbox modal, keeping the "Cancel" option to cancel suspicious transactions while leaving payment authorization to the PayPal buttons on the Review screen.
 
 ---
 

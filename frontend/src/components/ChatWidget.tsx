@@ -207,8 +207,6 @@ export function ChatWidget(p: Props) {
 
           <footer className="decide">
             <div className="decide-row">
-              {btn('protected', t('payProtected'))}
-              {btn('continue', rec === 'continue' ? t('sendPayment') : t('sendAnyway'))}
               {btn('cancel', t('cancel'))}
             </div>
           </footer>
