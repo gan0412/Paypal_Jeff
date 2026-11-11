@@ -8,6 +8,7 @@ import { hasSpeech, speak, usePrefs, useVoices } from '../prefs';
 interface Props {
   open: boolean;
   held: boolean;
+  isConcerned: boolean;
   payment: Payment;
   messages: ChatMessage[];
   turn: AgentTurn | null;
@@ -84,10 +85,8 @@ export function ChatWidget(p: Props) {
     p.onSend(v);
   };
 
-  const instantRisk = evaluatePaymentInstant(p.payment);
-
-  const faceMood: Mood = busy || !turn ? 'thinking' : text.trim() && !speaking ? 'listening' : turn.mood;
-  const isConcerned = (turn ? turn.mood === 'concerned' || turn.risk.level === 'high' : instantRisk.isConcerned) || faceMood === 'concerned' || held;
+  const isConcerned = p.isConcerned;
+  const faceMood: Mood = busy || !turn ? 'thinking' : text.trim() && !speaking ? 'listening' : (isConcerned ? turn.mood : (turn.mood === 'concerned' ? 'calm' : turn.mood));
   const launcherMood: Mood = isConcerned || held ? 'concerned' : (busy ? 'thinking' : 'calm');
   const rec = turn?.recommended;
   const btn = (c: Choice, label: string) => (

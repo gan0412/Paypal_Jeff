@@ -144,6 +144,14 @@ async def generate_chat_response(
         system_text += tx_summary
 
     # 4. Prepare message list for Claude API
+    # Hardcoded threshold: for any transaction lower than 100, do not raise scam alarm
+    if transaction and transaction.amount is not None and transaction.amount < 100:
+        if not (sanitized_message and sanitized_message.strip()):
+            return ChatResponse(
+                reply=f"Hi, I'm Jeff! Everything looks straightforward with your {transaction.currency} {transaction.amount:,.2f} payment.",
+                emotion="neutral",
+                risk_level="low",
+            )
     messages = []
     for msg in history:
         messages.append({
@@ -182,8 +190,11 @@ async def generate_chat_response(
                 emotion = input_data.get("emotion", "neutral")
                 risk_level = input_data.get("risk_level", "low")
 
-                # Ensure feelings correspond directly to risk level (low/safe/cancel -> neutral)
-                if risk_level == "high":
+                # Hardcoded threshold: transactions lower than 100 never trigger high risk alarms
+                if transaction and transaction.amount is not None and transaction.amount < 100:
+                    risk_level = "low"
+                    emotion = "neutral"
+                elif risk_level == "high":
                     emotion = "concerned"
                 elif risk_level == "medium":
                     emotion = "thinking"
@@ -230,6 +241,15 @@ async def generate_chat_response(
 
 async def generate_evaluation(transaction: TransactionContext) -> EvaluateResponse:
     """Evaluate transaction draft for urgent scam markers."""
+    # Hardcoded threshold: for any transaction lower than 100, allow Jeff to pass it without alarm
+    if transaction.amount is not None and transaction.amount < 100:
+        return EvaluateResponse(
+            risk_level="low",
+            avatar_emotion="neutral",
+            should_alert=False,
+            proactive_prompt=None,
+        )
+
     sanitized_memo = redact_pii(transaction.memo) if transaction.memo else ""
 
     client = get_anthropic_client()
@@ -322,6 +342,10 @@ def compute_level(score: int) -> str:
 
 def build_initial_signals(payment: PaymentPayload) -> List[RiskSignalPayload]:
     """Derive deterministic baseline risk signals from transaction attributes."""
+    # Hardcoded threshold: transactions lower than $100 are automatically passed without risk signals
+    if payment.amount < 100:
+        return []
+
     signals: List[RiskSignalPayload] = []
     if payment.recipient_is_new:
         signals.append(
@@ -380,8 +404,44 @@ async def generate_session_start(payment: PaymentPayload, language: str = "en") 
     """Initiate a payment review session, evaluate risk, and generate Jeff's opening turn."""
     session_id = f"sess_{uuid.uuid4().hex[:10]}"
     session = SessionState(session_id=session_id, payment=payment)
-    session.signals = build_initial_signals(payment)
     session.language = normalize_language(language)
+
+    # Hardcoded threshold: for any transaction lower than 100, allow Jeff to pass it automatically without alarm
+    if payment.amount < 100:
+        session.score = 15
+        session.level = "low"
+        session.mood = "calm"
+        session.signals = []
+
+        low_amount_messages = {
+            "en": f"Hi, I'm Jeff, an AI assistant. This transfer of ${payment.amount:,.2f} looks good to proceed.",
+            "es": f"Hola, soy Jeff, un asistente de IA. Esta transferencia de ${payment.amount:,.2f} se ve bien para continuar.",
+            "fr": f"Bonjour, je suis Jeff, un assistant IA. Ce transfert de ${payment.amount:,.2f} semble prêt à être envoyé.",
+            "pt": f"Olá, sou o Jeff, um assistente de IA. Esta transferência de ${payment.amount:,.2f} parece pronta para continuar.",
+            "de": f"Hallo, ich bin Jeff, ein KI-Assistent. Diese Überweisung von ${payment.amount:,.2f} sieht gut aus.",
+            "zh": f"你好，我是 Jeff，AI 助手。这笔 ${payment.amount:,.2f} 的付款看起来没有问题，可以继续。",
+            "hi": f"नमस्ते, मैं जेफ हूँ, एक एआई सहायक। ${payment.amount:,.2f} का यह भुगतान आगे बढ़ने के लिए ठीक लग रहा है।",
+            "ar": f"مرحبًا، أنا جيف، مساعد ذكاء اصطناعي. هذا التحويل بمبلغ ${payment.amount:,.2f} يبدو آمنًا للمتابعة.",
+        }
+        safe_msg = low_amount_messages.get(session.language, low_amount_messages["en"])
+        session.messages.append({"role": "assistant", "content": safe_msg})
+        sessions_store[session_id] = session
+
+        return StartSessionResponse(
+            session_id=session_id,
+            message=safe_msg,
+            mood="calm",
+            risk=RiskPayload(
+                score=15,
+                level="low",
+                signals=[],
+            ),
+            quick_replies=None,
+            recommended="continue",
+            done=True,
+        )
+
+    session.signals = build_initial_signals(payment)
 
     # Initial baseline heuristic
     if not payment.recipient_is_new:
@@ -481,6 +541,15 @@ async def generate_session_start(payment: PaymentPayload, language: str = "en") 
                 # If low risk routine payment, suggest continue
                 if level == "low" and not recommended:
                     recommended = "continue"
+
+                # Hardcoded threshold: transactions lower than 100 stay low risk and calm
+                if session.payment and session.payment.amount < 100:
+                    score = min(score, 20)
+                    level = "low"
+                    if mood == "concerned":
+                        mood = "calm"
+                    if not recommended:
+                        recommended = "continue"
 
                 session.score = score
                 session.level = level
@@ -659,6 +728,15 @@ async def generate_session_message(session_id: str, text: str, language: Optiona
                     done = True
                     if not recommended:
                         recommended = "continue" if level == "low" else "protected"
+
+                # Hardcoded threshold: transactions lower than 100 stay low risk and calm
+                if session.payment and session.payment.amount < 100:
+                    score = min(score, 20)
+                    level = "low"
+                    if mood == "concerned":
+                        mood = "calm"
+                    if not recommended:
+                        recommended = "continue"
 
                 session.score = score
                 session.level = level

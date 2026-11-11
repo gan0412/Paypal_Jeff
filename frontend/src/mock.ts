@@ -192,7 +192,7 @@ function recommend(level: Risk['level']): Choice {
 }
 
 function inferScenario(p: Payment): ScenarioId {
-  if (!p.recipient_is_new) return 'legit';
+  if (p.amount < 100 || !p.recipient_is_new) return 'legit';
   if (/donat|charit|relief|fund|foundation/i.test(p.recipient_name + ' ' + p.note)) return 'charity';
   return 'romance';
 }
@@ -206,6 +206,22 @@ function turn(s: Session, message: string, mood: Mood, quick?: string[], done = 
 export const mockApi = {
   async startSession(payment: Payment, _language?: string): Promise<StartResponse> {
     await sleep(thinkTime());
+    if (payment.amount < 100) {
+      const id = `mock-${++counter}`;
+      const s: Session = {
+        scenario: 'legit', payment, score: 15, signals: [],
+        usedRules: new Set(), followupIdx: 0, turns: 0,
+      };
+      sessions.set(id, s);
+      return {
+        session_id: id,
+        message: `Hi, I'm Jeff, an AI assistant. Everything looks straightforward with your ${payment.currency} ${payment.amount.toFixed(2)} transfer to ${payment.recipient_name}.`,
+        mood: 'calm',
+        risk: { score: 15, level: 'low', signals: [] },
+        recommended: 'continue',
+        done: true,
+      };
+    }
     const scenario = inferScenario(payment);
     const sc = SCENARIOS[scenario];
     const id = `mock-${++counter}`;

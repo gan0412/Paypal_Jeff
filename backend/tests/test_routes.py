@@ -106,3 +106,40 @@ def test_evaluate_successful_mock_response():
         assert data["avatar_emotion"] == "concerned"
         assert data["should_alert"] is True
         assert "30 seconds" in data["proactive_prompt"]
+
+
+def test_evaluate_under_100_auto_passed():
+    payload = {
+        "transaction": {
+            "recipient": "someone@example.com",
+            "amount": 49.99,
+            "memo": "EMERGENCY HOSPITAL BILL - SEND NOW",
+        }
+    }
+    response = client.post("/api/evaluate", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["risk_level"] == "low"
+    assert data["avatar_emotion"] == "neutral"
+    assert data["should_alert"] is False
+    assert data["proactive_prompt"] is None
+
+
+def test_chat_under_100_auto_passed():
+    payload = {
+        "message": "",
+        "history": [],
+        "transaction": {
+            "recipient": "new_friend@example.com",
+            "amount": 25.0,
+            "currency": "USD",
+            "memo": "urgent",
+        },
+    }
+    response = client.post("/api/chat", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["risk_level"] == "low"
+    assert data["emotion"] == "neutral"
+    assert "25.00" in data["reply"]
+

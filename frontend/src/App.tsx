@@ -146,8 +146,15 @@ export default function App() {
     setTurn(null); setResult(null); setError(null); setBusy(false); sessionKey.current = '';
   };
 
+  const isReviewStep = step === 'review';
   const instantRisk = evaluatePaymentInstant(payment);
-  const isConcerned = (turn ? turn.mood === 'concerned' || turn.risk.level === 'high' : instantRisk.isConcerned) || held;
+  const isRiskConcerned =
+    payment.amount >= 100 &&
+    (turn ? turn.mood === 'concerned' || turn.risk.level === 'high' : instantRisk.isConcerned);
+
+  // Jeff only warns the user after clicking Next (on the Review step).
+  // On the Send step (where user can still edit his transaction), Jeff stays normal.
+  const isConcerned = isReviewStep && (isRiskConcerned || held);
 
   return (
     <PayPalScriptProvider options={paypalOptions}>
@@ -169,7 +176,7 @@ export default function App() {
       </nav>
 
       <main className={`app ${step === 'result' ? 'solo' : ''}`}>
-        {step !== 'result' && <Hero held={isConcerned || held} />}
+        {step !== 'result' && <Hero held={isConcerned} />}
         <div className="stage">
           {step === 'send' && <SendStep payment={payment} onChange={handlePaymentChange} onNext={handleNext} />}
 
@@ -191,7 +198,7 @@ export default function App() {
       </main>
 
       {step !== 'result' && (
-        <ChatWidget open={chatOpen} held={held} payment={payment} messages={messages} turn={turn} busy={busy} error={error}
+        <ChatWidget open={chatOpen} held={held} isConcerned={isConcerned} payment={payment} messages={messages} turn={turn} busy={busy} error={error}
           onOpen={openChat} onClose={() => setChatOpen(false)} onSend={send} onDecide={decide} onRetry={() => void startSession()} />
       )}
     </PayPalScriptProvider>
