@@ -1,9 +1,11 @@
 # Handoff: PayPal AI Hackathon — "Jeff" (APP Scam De-escalation Companion)
 
-**Generated:** 2026-11-08  
+**Generated:** 2026-11-11  
 **Repository:** `Paypal_Jeff` (`https://github.com/gan0412/Paypal_Jeff`)  
-**Active Branch:** `sdk-integration`  
-**Open Pull Request:** [PR #2](https://github.com/gan0412/Paypal_Jeff/pull/2) (`feat/backend-setup` -> `main`)
+**Active Branch:** `feat/alert-on-next-and-threshold`  
+**Open Pull Requests:**
+- [PR #6](https://github.com/gan0412/Paypal_Jeff/pull/6) (`feat/stage-ui-integration` -> `main`)
+- [PR #7](https://github.com/gan0412/Paypal_Jeff/pull/7) (`feat/alert-on-next-and-threshold` -> `main`)
 
 ---
 
@@ -45,10 +47,13 @@
   - **UI & Docs Polish:** Removed mock caution banners, demo tags ("Connected to backend", "Sample data"), footer disclaimers, and the "New recipient (demo)" checkbox per user request. Comprehensive root [`README.md`](file:///Users/Ganes/Paypal_Jeff/README.md) added with judge overview and teammate quickstart.
 
 ### C. Git & Pull Request Status
-- Work is fully committed and pushed to `feat/backend-setup`.
-- **Pull Request #2:** Successfully merged into `main` (`25bb787..0aa8149`).
-- **Pull Request #3:** Created for [`sdk-integration` -> `main`](https://github.com/gan0412/Paypal_Jeff/pull/3).
-- **Active Working Branch:** `sdk-integration` (includes official `@paypal/react-paypal-js` integration, README overhaul, UI polish, and Google Slides MCP plugin configuration).
+- **PR #2 & PR #3:** Merged into `main`.
+- **PR #5:** Merged into `main` (`6748f71`), adding the Inclusivity layer (avatar customization, 8 languages + RTL, TTS voice picker, and 2-stage red-alert animations).
+- **PR #6:** Created for [`feat/stage-ui-integration` -> `main`](https://github.com/gan0412/Paypal_Jeff/pull/6) to adopt `Hero.tsx`, `ResultCard.tsx`, 6-scenario grid, and stage aesthetics.
+- **PR #7:** Created for [`feat/alert-on-next-and-threshold` -> `main`](https://github.com/gan0412/Paypal_Jeff/pull/7):
+  - Jeff remains calm on the Send/edit page and only raises the red alert badge/face on the Review step (after clicking **Next**).
+  - Hardcoded < $100 auto-pass rule in backend and frontend risk evaluators (bypassing LLM calls for amounts under $100).
+  - Fixed chat widget layering: elevated `.widget` to `z-index: 10000`, `.launcher` to `z-index: 9990`, and isolated `.paypal-btn-wrap` to `position: relative; z-index: 1` so the chatbox modal is always layered on top of PayPal button iframes.
 
 ---
 
