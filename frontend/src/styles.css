@@ -184,6 +184,7 @@ button.wide { width: 100%; padding: 16px; font-size: 18px; }
 .rows dd { grid-column: 1; margin: 0; font-weight: 500; word-break: break-word; }
 .rows dd .mute { display: block; font-weight: 400; }
 .rows .linkbtn { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+.paypal-btn-wrap { position: relative; z-index: 1; }
 
 /* result screens & confetti */
 .result { position: relative; overflow: hidden; text-align: center; padding: 36px 26px; }
@@ -220,7 +221,7 @@ button.wide { width: 100%; padding: 16px; font-size: 18px; }
 .foot { margin: 28px auto 0; font-size: 12px; color: rgba(255,255,255,.7); text-align: center; max-width: 640px; }
 
 /* ---------- floating Jeff launcher ---------- */
-.launcher { position: fixed; right: 20px; bottom: 20px; z-index: 40; display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 0; cursor: pointer; }
+.launcher { position: fixed; right: 20px; bottom: 20px; z-index: 9990; display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 0; cursor: pointer; }
 .launcher-label { background: #ffc439; color: #001435; font-weight: 600; font-size: 14px; padding: 9px 16px; border-radius: 999px; box-shadow: var(--pop); }
 .launcher-face { position: relative; display: block; border-radius: 50%; box-shadow: 0 0 0 4px rgba(255,255,255,.9), var(--pop); transition: transform .2s; }
 .launcher-face::before { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 3px solid #ffc439; animation: ripple 2.4s ease-out infinite; }
@@ -230,7 +231,7 @@ button.wide { width: 100%; padding: 16px; font-size: 18px; }
 @keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(192,57,43,.5); } 80%, 100% { box-shadow: 0 0 0 10px rgba(192,57,43,0); } }
 
 /* ---------- chat widget ---------- */
-.widget { position: fixed; right: 20px; bottom: 20px; z-index: 50; width: 400px; max-width: calc(100vw - 24px); height: min(700px, calc(100dvh - 40px));
+.widget { position: fixed; right: 20px; bottom: 20px; z-index: 10000; width: 400px; max-width: calc(100vw - 24px); height: min(700px, calc(100dvh - 40px));
   background: var(--card); border: 0; border-radius: 24px; box-shadow: var(--pop); padding: 0 16px 16px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; animation: pop .45s cubic-bezier(.2,1.2,.3,1) both; }
 @keyframes pop { from { opacity: 0; transform: translateY(30px) scale(.9); } }
 .w-head { margin: 0 -16px; padding: 14px 16px; background: linear-gradient(135deg, #003087, #0070e0); color: #fff; display: flex; align-items: center; gap: 12px; }
